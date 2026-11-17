@@ -177,8 +177,8 @@ nur die Zahlen. Hardware: RTX 5060 Ti 16 GB.
 |---|---|---|
 | Stichwort (im Prozess) | 4,6 ms | 10 ms |
 | Hybrid (im Prozess, inkl. Frage einbetten) | 51 ms | 64 ms |
-| Stichwort über den Dienst (HTTP) | 11 ms | |
-| Hybrid über den Dienst (HTTP) | 61 ms | 102 ms |
+| Stichwort über den Dienst (HTTP) | 10 ms | 46 ms |
+| Hybrid über den Dienst (HTTP) | 56 ms | 70 ms |
 | `localrag search` über den Dienst (inkl. Python-Start) | ~2 s | |
 | `localrag search` ohne Dienst (Modell wird geladen) | ~19 s | |
 | `localrag ask` mit Gemma 4 26B über den Dienst | 6–8 s | |

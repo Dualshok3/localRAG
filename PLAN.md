@@ -187,7 +187,7 @@ CREATE TABLE documents (id INTEGER PRIMARY KEY, path TEXT UNIQUE, hash TEXT, mti
                         size INTEGER, filetype TEXT, status TEXT, error TEXT, indexed_at REAL);
 CREATE TABLE chunks    (id INTEGER PRIMARY KEY, document_id INTEGER REFERENCES documents ON DELETE CASCADE,
                         text TEXT, page INTEGER, heading_path TEXT, char_start INTEGER, char_end INTEGER);
-CREATE VIRTUAL TABLE chunks_fts USING fts5(text_stemmed, content='', tokenize='unicode61 remove_diacritics 2');
+CREATE VIRTUAL TABLE chunks_fts USING fts5(body, tokenize='unicode61 remove_diacritics 2');  -- rowid = chunks.id, body = gestemmter Text
 CREATE VIRTUAL TABLE chunks_vec USING vec0(embedding float[1024]);   -- rowid = chunks.id
 ```
 
@@ -241,8 +241,8 @@ RAG/
 ## 7. Roadmap in Phasen
 
 ### Phase 0 – Setup (½ Tag)
-- [ ] `uv init`, Python 3.12, `pyproject.toml`, ruff, pytest, pre-commit
-- [ ] GitHub Actions CI (Lint + Tests)
+- [x] `uv init`, Python 3.12, `pyproject.toml`, ruff, pytest, pre-commit
+- [x] GitHub Actions CI (Lint + Tests + Eval + gitleaks)
 - [ ] Ollama installieren, Modell ziehen, CUDA-Check (`torch.cuda.is_available()`)
 - [ ] Testkorpus anlegen: ~200 eigene, *unkritische* Dateien in `D:\rag-testdata`
 
@@ -251,11 +251,11 @@ RAG/
 ### Phase 1 – MVP: Suchen über einen Ordner (1 Woche)
 
 **1a – Stichwortsuche (BM25)**
-- [ ] Scanner + Parser für PDF, DOCX, TXT, MD
-- [ ] Einfacher Chunker (fixe Größe + Überlappung)
-- [ ] SQLite-Schema (`documents`, `chunks`, `chunks_fts`), deutscher Snowball-Stemmer vor dem Einfügen
-- [ ] `localrag index <ordner>` und `localrag search "<frage>"` → Top-10 mit Pfad + Ausschnitt
-- [ ] **Baseline festhalten:** 20 erste Testfragen, wie viele findet reines BM25?
+- [x] Scanner + Parser für PDF, DOCX, TXT, MD
+- [x] Einfacher Chunker (fixe Größe + Überlappung)
+- [x] SQLite-Schema (`documents`, `chunks`, `chunks_fts`), deutscher Snowball-Stemmer vor dem Einfügen
+- [x] `localrag index <ordner>` und `localrag search "<frage>"` → Top-10 mit Pfad + Ausschnitt
+- [x] **Baseline festhalten:** 21 Testfragen auf synthetischem Korpus → [eval/results/bm25_baseline.md](eval/results/bm25_baseline.md)
 
 **1b – Semantische Suche + Hybrid**
 - [ ] bge-m3-Embeddings → `chunks_vec` (sqlite-vec)

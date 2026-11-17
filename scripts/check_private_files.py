@@ -12,9 +12,28 @@ from pathlib import PurePosixPath
 BLOCKED_DIRS = {"data", "index", "models", "private", ".lancedb"}
 
 DOCUMENT_EXTENSIONS = {
-    ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt", ".ods",
-    ".eml", ".msg", ".pst", ".ost", ".jpg", ".jpeg", ".png", ".heic", ".tif", ".tiff",
-    ".zip", ".7z", ".rar",
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".ppt",
+    ".pptx",
+    ".odt",
+    ".ods",
+    ".eml",
+    ".msg",
+    ".pst",
+    ".ost",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".heic",
+    ".tif",
+    ".tiff",
+    ".zip",
+    ".7z",
+    ".rar",
 }
 
 DATABASE_EXTENSIONS = {".db", ".sqlite", ".sqlite3", ".lance", ".parquet", ".npy", ".faiss"}

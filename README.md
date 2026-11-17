@@ -30,14 +30,14 @@ Die Kündigungsfrist beträgt drei Monate zum Monatsende [1].
 ```mermaid
 flowchart LR
     F[Dateien] --> P[Parser + OCR] --> C[Chunker] --> E[Embeddings bge-m3]
-    E --> V[(LanceDB)]
+    E --> V[(SQLite sqlite-vec)]
     C --> B[(SQLite FTS5)]
     Q[Frage] --> V & B --> R[RRF + Reranker] --> L[LLM via Ollama] --> A[Antwort + Zitate]
 ```
 
 ## Tech-Stack
 
-Python 3.12 · uv · PyTorch/CUDA · sentence-transformers · LanceDB · SQLite FTS5 · Ollama · FastAPI · Typer · MCP
+Python 3.12 · uv · PyTorch/CUDA · sentence-transformers · SQLite (FTS5 + sqlite-vec) · Ollama · FastAPI · Typer · MCP
 
 ## Lizenz
 

@@ -19,8 +19,8 @@ flowchart LR
         A[Dateien auf C:/D:] --> B[Parser<br/>PDF, DOCX, XLSX, MD, Code, OCR]
         B --> C[Chunking<br/>Text in Abschnitte teilen]
         C --> D[Embedding-Modell<br/>Text → Vektor]
-        C --> E[Volltext-Index<br/>BM25]
-        D --> F[(Vektor-DB)]
+        C --> E[(SQLite FTS5<br/>BM25)]
+        D --> F[(SQLite sqlite-vec<br/>Vektoren)]
     end
     subgraph Abfrage["Abfrage (jede Frage)"]
         Q[Frage] --> QE[Frage → Vektor]
@@ -40,7 +40,7 @@ flowchart LR
 | **Parser** | Holt reinen Text aus PDF, Word, Excel, Mails, Bildern (OCR) | Schlechte Extraktion = schlechte Antworten. Hier steckt oft 50 % der Qualität. |
 | **Chunking** | Zerlegt Dokumente in Stücke von ~300–800 Tokens mit Überlappung | Das LLM bekommt nur relevante Absätze statt ganzer 80-Seiten-PDFs. |
 | **Embeddings** | Ein kleines Modell wandelt Text in einen Zahlenvektor (z. B. 1024 Dimensionen). Ähnliche *Bedeutung* → ähnliche Vektoren | Findet „Kündigungsfrist“ auch, wenn im Text „Beendigung des Mietverhältnisses“ steht. |
-| **Vektor-DB** | Speichert Vektoren und findet die nächsten Nachbarn in Millisekunden | Semantische Suche über Millionen Chunks. |
+| **Vektor-Speicher** | Speichert Vektoren und findet die nächsten Nachbarn. Hier: `sqlite-vec` in derselben SQLite-Datei, keine separate Vektor-DB | Semantische Suche. Bei < ~1 Mio. Chunks reicht Brute-Force-Vergleich völlig aus. |
 | **BM25 / Volltext** | Klassische Stichwortsuche | Exakte Begriffe (Rechnungsnummern, Namen, Fehlercodes) findet Vektorsuche schlecht. |
 | **Hybrid + RRF** | Kombiniert beide Trefferlisten (Reciprocal Rank Fusion) | Best of both worlds – in Benchmarks fast immer besser als eine Methode allein. |
 | **Reranker** | Ein Cross-Encoder bewertet *Frage + Chunk* gemeinsam, genauer aber langsamer | Sortiert die Top 50 neu und hebt die wirklich passenden nach oben. |
@@ -138,8 +138,9 @@ Was es **besonders** macht (statt nur LangChain-Tutorial nachgebaut):
 | OCR | **Tesseract** (deu+eng) oder **RapidOCR** | EasyOCR, Docling-OCR | Nur für Scans/Bilder, opt-in pro Ordner. |
 | Chunking | Eigene Implementierung: strukturbewusst (Überschriften, Absätze), 500 Tokens, 15 % Überlappung | LangChain-Splitter | Selbst bauen = mehr lernen und im README erklärbar. |
 | Embeddings | **BAAI/bge-m3** (mehrsprachig, 1024 Dim) | multilingual-e5-large, Qwen3-Embedding | Sehr gut für Deutsch + Englisch, läuft lokal auf der GPU. |
-| Vektor-DB | **LanceDB** (eingebettet, dateibasiert) | Qdrant (lokal), sqlite-vec, Chroma | Kein Server nötig, schnell, unterstützt Filter + Volltext. |
-| Volltext | **SQLite FTS5** (BM25) oder Tantivy | LanceDB-FTS | SQLite ist eh da für das Manifest. |
+| Datenhaltung | **Eine SQLite-Datei** für Manifest, Chunks, Volltext und Vektoren | – | Ein System, eine Datei, Transaktionen: Datei geändert → Text und Vektoren atomar aktualisiert. Siehe [ADR 0001](docs/adr/0001-sqlite-statt-vektordatenbank.md). |
+| Volltext | **SQLite FTS5** (BM25) + deutscher Snowball-Stemmer vorab in Python | Tantivy | FTS5 kann nur englisches Stemming. Deshalb Text vor dem Einfügen normalisieren. |
+| Vektoren | **sqlite-vec** (int8/binär möglich) | NumPy/Torch Brute-Force, LanceDB, Qdrant | Keine separate Vektor-DB nötig. Hinter einem Interface gekapselt, damit ein Wechsel später möglich ist. |
 | Reranker | **BAAI/bge-reranker-v2-m3** | mxbai-rerank | Mehrsprachig, deutliche Qualitätssteigerung. |
 | LLM | **Ollama** mit z. B. Qwen3 8B / Gemma 3 12B / Llama 3.1 8B | llama.cpp, LM Studio, optional Claude API | Einfach, lokal, OpenAI-kompatible API. |
 | Datei-Watcher | **watchdog** | Windows USN-Journal | Später USN-Journal für Profi-Bonus (so arbeitet auch Everything). |
@@ -162,10 +163,13 @@ Was es **besonders** macht (statt nur LangChain-Tutorial nachgebaut):
 └──────────────┘             └──────────────┘          │ embed (GPU, Batches)        │
         ▲                                               └──────────┬──────────────────┘
         │ Scan beim Start (mtime + Hash vs. Manifest)               │
-┌───────┴──────┐                                       ┌──────────▼──────────────────┐
-│  Manifest    │ ◄──────────────────────────────────── │ LanceDB (Vektoren)          │
-│ (SQLite)     │   Pfad, Hash, mtime, Status           │ SQLite FTS5 (BM25)          │
-└──────────────┘                                       └──────────┬──────────────────┘
+        │                                              ┌──────────▼──────────────────┐
+        └───────────────────────────────────────────── │ localrag.db (SQLite, auf D:)│
+                                                       │  documents  (Manifest)      │
+                                                       │  chunks     (Text, Seite)   │
+                                                       │  chunks_fts (FTS5 / BM25)   │
+                                                       │  chunks_vec (sqlite-vec)    │
+                                                       └──────────┬──────────────────┘
                                                                   │
                     ┌─────────────────────────────────────────────▼───────────┐
                     │ Query-Engine: Query-Embed → Hybrid (RRF) → Filter →      │
@@ -177,10 +181,18 @@ Was es **besonders** macht (statt nur LangChain-Tutorial nachgebaut):
 
 ### Datenmodell (vereinfacht)
 
-```text
-documents:  id, path, hash, mtime, size, filetype, status, error, indexed_at
-chunks:     id, document_id, text, page, heading_path, char_start, char_end, vector[1024]
+```sql
+-- alles in einer Datei: D:\localrag\localrag.db
+CREATE TABLE documents (id INTEGER PRIMARY KEY, path TEXT UNIQUE, hash TEXT, mtime REAL,
+                        size INTEGER, filetype TEXT, status TEXT, error TEXT, indexed_at REAL);
+CREATE TABLE chunks    (id INTEGER PRIMARY KEY, document_id INTEGER REFERENCES documents ON DELETE CASCADE,
+                        text TEXT, page INTEGER, heading_path TEXT, char_start INTEGER, char_end INTEGER);
+CREATE VIRTUAL TABLE chunks_fts USING fts5(text_stemmed, content='', tokenize='unicode61 remove_diacritics 2');
+CREATE VIRTUAL TABLE chunks_vec USING vec0(embedding float[1024]);   -- rowid = chunks.id
 ```
+
+Hybrid-Suche in einem Ablauf: FTS5 liefert Top 50 nach BM25, sqlite-vec liefert Top 50 nach Kosinus-Ähnlichkeit,
+beide werden per RRF zusammengeführt und dann gerankt.
 
 `heading_path` (z. B. *„Mietvertrag > §5 Kündigung“*) wird mit in den Chunk-Text fürs Embedding geschrieben
 – ein einfacher Trick, der die Trefferqualität spürbar verbessert („contextual chunking“).
@@ -199,9 +211,11 @@ RAG/
 │   │   ├── parsers/        # pdf.py, office.py, text.py, ocr.py, email.py
 │   │   └── chunker.py
 │   ├── index/
+│   │   ├── db.py           # SQLite-Verbindung, Schema, Migrationen
 │   │   ├── embedder.py     # bge-m3, Batching, GPU
-│   │   ├── vector_store.py # LanceDB
-│   │   └── fulltext.py     # SQLite FTS5
+│   │   ├── vector_store.py # sqlite-vec (hinter Interface, austauschbar)
+│   │   ├── fulltext.py     # SQLite FTS5
+│   │   └── text_norm.py    # deutscher Stemmer, Kleinschreibung, Umlaute
 │   ├── retrieval/
 │   │   ├── hybrid.py       # RRF
 │   │   └── reranker.py
@@ -235,12 +249,20 @@ RAG/
 **Ergebnis:** Grünes CI-Badge, lauffähiges Grundgerüst.
 
 ### Phase 1 – MVP: Suchen über einen Ordner (1 Woche)
+
+**1a – Stichwortsuche (BM25)**
 - [ ] Scanner + Parser für PDF, DOCX, TXT, MD
 - [ ] Einfacher Chunker (fixe Größe + Überlappung)
-- [ ] bge-m3-Embeddings → LanceDB
+- [ ] SQLite-Schema (`documents`, `chunks`, `chunks_fts`), deutscher Snowball-Stemmer vor dem Einfügen
 - [ ] `localrag index <ordner>` und `localrag search "<frage>"` → Top-10 mit Pfad + Ausschnitt
+- [ ] **Baseline festhalten:** 20 erste Testfragen, wie viele findet reines BM25?
 
-**Ergebnis:** Erste semantische Suche. Erstes Demo-GIF fürs README.
+**1b – Semantische Suche + Hybrid**
+- [ ] bge-m3-Embeddings → `chunks_vec` (sqlite-vec)
+- [ ] Hybrid-Suche mit RRF
+- [ ] Dieselben 20 Fragen erneut → erster Vorher/Nachher-Vergleich
+
+**Ergebnis:** Funktionierende Hybrid-Suche in einer SQLite-Datei. Erstes Demo-GIF fürs README.
 
 ### Phase 2 – Antworten generieren (3–4 Tage)
 - [ ] Ollama-Anbindung, Prompt mit nummerierten Quellen `[1] [2]`
@@ -281,7 +303,8 @@ RAG/
 - [ ] Windows **USN-Journal** statt watchdog (extrem effizient, wie Everything)
 - [ ] Bildersuche mit CLIP/SigLIP („Foto vom Strand mit Hund“)
 - [ ] Query-Rewriting / HyDE, Multi-Query
-- [ ] Vektor-Quantisierung (int8/binary) + Benchmark Speicher vs. Qualität
+- [ ] Vektor-Quantisierung (int8/binary) in sqlite-vec + Benchmark Speicher vs. Qualität
+- [ ] Skalierungstest: ab wann wird Brute-Force zu langsam? Dann ANN-Index (z. B. LanceDB/Qdrant) hinter demselben Interface vergleichen
 - [ ] Agentic RAG: LLM darf mehrfach suchen, z. B. „Summiere alle Stromrechnungen 2024“
 - [ ] Docker-Compose für einfache Installation
 - [ ] Blogpost / `docs/lessons-learned.md`
@@ -298,6 +321,8 @@ RAG/
 | C: läuft voll | Modelle (`OLLAMA_MODELS`, HF-Cache) und Index auf **D:** konfigurieren. |
 | Schlechte PDF-Extraktion (Tabellen, Spalten) | Mit PyMuPDF starten, Problemfälle sammeln, gezielt Docling testen. |
 | Python 3.14 nicht kompatibel mit ML-Libs | Projekt mit uv auf 3.12 pinnen. |
+| sqlite-vec ist noch vor Version 1.0 / Brute-Force wird bei sehr vielen Chunks langsam | Vektorzugriff nur über `vector_store.py`, Quantisierung nutzen, Fallback NumPy/Torch auf der GPU. |
+| FTS5 versteht kein Deutsch (Stemming, zusammengesetzte Wörter) | Eigene Normalisierung vor dem Einfügen. Den Rest fängt die Vektorsuche ab. |
 | Scope Creep | Phasen strikt nacheinander. Nach Phase 3 ist das Projekt bereits vorzeigbar. |
 
 ---
@@ -307,7 +332,7 @@ RAG/
 - [ ] **README** mit: Ein-Satz-Pitch, Demo-GIF ganz oben, Features, Architektur-Diagramm (Mermaid), Quickstart in 3 Befehlen, **Benchmark-Tabelle**, Roadmap
 - [ ] Badges: CI, Python-Version, Lizenz
 - [ ] Saubere Commits (Conventional Commits: `feat:`, `fix:`, `docs:`), Issues/Milestones pro Phase
-- [ ] `docs/adr/` – kurze Entscheidungsdokumente („Warum LanceDB statt Chroma?“) – zeigt Engineering-Denken
+- [ ] `docs/adr/` – kurze Entscheidungsdokumente („Warum SQLite statt Vektordatenbank?“) – zeigt Engineering-Denken
 - [ ] Tests mit sinnvoller Abdeckung (Parser, Chunker, RRF sind gut testbar)
 - [ ] Repo-Topics: `rag`, `llm`, `semantic-search`, `local-first`, `ollama`, `vector-database`, `mcp`
 - [ ] Releases mit Changelog
@@ -337,4 +362,4 @@ RAG/
 
 1. Phase 0 umsetzen (Projektgerüst, CI, Ollama + CUDA-Check)
 2. Testordner mit ~200 Dateien auf `D:` anlegen
-3. Phase 1 starten: erster `localrag search`-Aufruf
+3. Phase 1a starten: erster `localrag search`-Aufruf mit BM25

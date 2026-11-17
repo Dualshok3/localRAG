@@ -1,8 +1,43 @@
 # LocalRAG – Semantische Suche über die eigenen Dateien
 
+[![CI](https://github.com/Dualshok3/RAG/actions/workflows/ci.yml/badge.svg)](https://github.com/Dualshok3/RAG/actions/workflows/ci.yml)
+![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
+![100 % lokal](https://img.shields.io/badge/daten-100%25%20lokal-success)
+
 > Frag deinen Computer in natürlicher Sprache – komplett lokal, mit Quellenangabe.
 
-**Status:** 🚧 Hybrid-Suche aus BM25 und Vektoren (bge-m3) über PDF, DOCX, Markdown und TXT. Antworten mit Quellenangabe per lokalem LLM (LM Studio) funktionieren, die Antwortqualität ist aber noch nicht gemessen. Details in [PLAN.md](PLAN.md).
+Die Windows-Suche findet Dateinamen und exakte Wörter. LocalRAG versteht den **Inhalt**: Die Frage
+„Darf ich eine Katze halten?“ findet den Paragrafen *Haustiere* im Mietvertrag, obwohl das Wort „Katze“
+dort nirgends steht.
+
+```text
+> localrag ask "Darf ich eine Katze halten?"
+
+Die Haltung von Haustieren bedarf der vorherigen Zustimmung des Vermieters, ausgenommen es handelt
+sich um Kleintiere in Käfigen [1].
+
+Quellen
+[1] D:\Dokumente\Wohnung\mietvertrag.md  · Mietvertrag Wohnung Lindenstraße 12 > §8 Haustiere
+```
+
+*Antwort von Gemma 4 26B über den synthetischen Testkorpus, Pfad gekürzt. Suche rund 30 ms, Antwort rund 3 s.*
+
+## Was es kann
+
+- 🔒 **100 % lokal:** Embeddings auf der eigenen GPU, Antworten über LM Studio oder einen anderen lokalen
+  OpenAI-kompatiblen Server. Keine Cloud, kein Konto.
+- 🔎 **Hybrid-Suche:** BM25-Stichwortsuche (SQLite FTS5, deutsches Stemming) plus Vektorsuche
+  (bge-m3, sqlite-vec), zusammengeführt per Reciprocal Rank Fusion. Alles in **einer** SQLite-Datei,
+  Begründung in [ADR 0001](docs/adr/0001-sqlite-statt-vektordatenbank.md).
+- 💬 **Antworten mit Zitaten:** Jede Aussage ist mit `[n]` belegt. Steht nichts in den Dateien, sagt das
+  Modell das, statt zu raten.
+- ⚡ **Inkrementell:** Beim zweiten Lauf werden nur geänderte Dateien neu verarbeitet.
+- 🚀 **Hintergrunddienst:** `localrag serve` hält das Modell geladen, Suchen dauern dann Millisekunden.
+- 🤖 **MCP-Server:** Claude Desktop, Claude Code und andere Clients können direkt in den Dateien suchen.
+- 📊 **Gemessen statt behauptet:** Ein Eval-Set vergleicht Stichwort-, Vektor- und Hybridsuche, die
+  Ergebnisse stehen [weiter unten](#messung-stichwort-vs-vektor-vs-hybrid).
+
+Formate: PDF, DOCX, Markdown, TXT. Weitere Formate, Reranker und OCR sind geplant, siehe [PLAN.md](PLAN.md).
 
 ## Quickstart
 
@@ -121,40 +156,57 @@ Was man daraus lernt:
 Einschränkung: 35 Fragen sind wenig, ein bis zwei Fragen verschieben die Werte um mehrere Prozentpunkte.
 Selbst messen: `uv run python eval/run_eval.py`
 
-## Idee
-
-Die Windows-Suche findet Dateinamen und exakte Wörter. LocalRAG versteht den **Inhalt**:
-
-```text
-> localrag ask "Wie lange ist die Kündigungsfrist in meinem Mietvertrag?"
-
-Die Kündigungsfrist beträgt drei Monate zum Monatsende [1].
-
-[1] D:\Dokumente\Wohnung\Mietvertrag_2021.pdf – Seite 4, §5 Kündigung
-```
-
-## Geplante Features
-
-- 🔒 **100 % lokal** – keine Daten verlassen den Rechner (LM Studio oder jeder andere OpenAI-kompatible Server + lokale Embeddings)
-- 🔎 **Hybrid-Suche** – semantische Vektorsuche + BM25-Stichwortsuche + Reranking
-- 📄 PDF, Word, Excel, PowerPoint, Markdown, E-Mails, Quellcode, OCR für Scans
-- ⚡ **Inkrementelle Indexierung** – nur geänderte Dateien werden neu verarbeitet
-- 📊 **Messbare Qualität** – Eval-Set mit Recall@k / MRR, Benchmark gegen die Windows-Suche
-- 🤖 **MCP-Server** – Claude & Co. können direkt in den eigenen Dateien suchen
-
 ## Architektur
 
 ```mermaid
 flowchart LR
-    F[Dateien] --> P[Parser + OCR] --> C[Chunker] --> E[Embeddings bge-m3]
+    F[Dateien] --> P[Parser] --> C[Chunker] --> E[Embeddings bge-m3]
     E --> V[(SQLite sqlite-vec)]
     C --> B[(SQLite FTS5)]
-    Q[Frage] --> V & B --> R[RRF + Reranker] --> L[LLM via LM Studio] --> A[Antwort + Zitate]
+    Q[Frage] --> V & B --> R[RRF] --> L[LLM via LM Studio] --> A[Antwort + Zitate]
+    R -.-> RR[Reranker, geplant] -.-> L
 ```
+
+| Schritt | Umsetzung | Code |
+|---|---|---|
+| Parsen | PyMuPDF (PDF, pro Seite), python-docx (Überschriften, Tabellen), Markdown/TXT | [ingest/parsers](src/localrag/ingest/parsers) |
+| Chunking | Absätze zu ~350 Wörtern packen, 50 Wörter Überlappung, Überschriftenpfad merken | [chunker.py](src/localrag/ingest/chunker.py) |
+| Stichwortindex | FTS5 mit BM25, Text vorab per Snowball auf Wortstämme reduziert | [text_norm.py](src/localrag/index/text_norm.py) |
+| Vektorindex | bge-m3 (1024 Dim., fp16 auf CUDA), normalisiert in sqlite-vec | [vector_store.py](src/localrag/index/vector_store.py) |
+| Fusion | Reciprocal Rank Fusion (k = 60) über beide Trefferlisten | [hybrid.py](src/localrag/retrieval/hybrid.py) |
+| Antwort | Prompt nur mit Quellen, Zitatpflicht, Schutz vor Anweisungen in Dokumenten | [prompts.py](src/localrag/generation/prompts.py) |
+
+## Geplant
+
+Reranker (bge-reranker-v2-m3) · Benchmark gegen die Windows-Suche · Excel, PowerPoint, E-Mails ·
+OCR für Scans · Dateiüberwachung · Web-Oberfläche. Reihenfolge und Begründung stehen in [PLAN.md](PLAN.md).
+
+## Keine privaten Daten im Repo
+
+Das Projekt arbeitet mit sehr persönlichen Dateien, deshalb gibt es mehrere Sicherungen:
+
+- Index, Modelle und Dokumente liegen außerhalb des Repos (`~/.localrag`, `LOCALRAG_MODELS`).
+- Der Testkorpus ist vollständig erfunden ([eval/corpus](eval/corpus)). Test-PDFs und -DOCX entstehen erst
+  zur Laufzeit.
+- [pre-commit](.pre-commit-config.yaml) blockiert Dokumente, Datenbanken und `.env`-Dateien
+  ([check_private_files.py](scripts/check_private_files.py)) und sucht mit gitleaks nach Geheimnissen.
+  gitleaks läuft zusätzlich in der CI.
 
 ## Tech-Stack
 
 Python 3.12 · uv · PyTorch/CUDA · sentence-transformers · SQLite (FTS5 + sqlite-vec) · LM Studio (OpenAI-API) · httpx · FastAPI · Typer · MCP
+
+## Entwickeln
+
+```bash
+uv sync                          # ohne PyTorch, Tests nutzen ein Fake-Embedding
+uv run pytest -q
+uv run ruff check . && uv run ruff format --check .
+uvx pre-commit install           # Schutz vor privaten Dateien und Secrets bei jedem Commit
+```
+
+Die CI läuft unter Windows und Ubuntu und prüft zusätzlich, dass die Stichwortsuche im Eval eine
+Mindestqualität hält.
 
 ## Lizenz
 

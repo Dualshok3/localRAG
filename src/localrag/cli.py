@@ -18,9 +18,11 @@ from rich.text import Text
 from localrag import __version__
 from localrag.config import DEFAULT_EXCLUDED_DIRS, DEFAULT_MAX_FILE_MB, ENV_DB, default_db_path
 from localrag.index.db import Database
-from localrag.ingest.indexer import index_paths
+from localrag.index.embedder import Embedder, SemanticUnavailableError, load_embedder, semantic_available
+from localrag.index.vector_store import EmbeddingModelMismatchError, VectorStore
+from localrag.ingest.indexer import IndexStats, index_paths
 from localrag.ingest.scanner import FileInfo
-from localrag.retrieval.keyword import keyword_search
+from localrag.retrieval.hybrid import search as run_search
 
 # Windows-Konsolen nutzen teils noch cp1252 → Umlaute/Sonderzeichen nie mit Absturz quittieren.
 for _stream in (sys.stdout, sys.stderr):
@@ -44,14 +46,23 @@ def index(
         list[str] | None, typer.Option("--exclude", "-x", help="Zusätzliche Ordnernamen ausschließen.")
     ] = None,
     max_file_mb: Annotated[float, typer.Option(help="Größere Dateien überspringen.")] = DEFAULT_MAX_FILE_MB,
+    embed: Annotated[
+        bool | None,
+        typer.Option("--embed/--no-embed", help="Vektoren erzeugen (Standard: wenn installiert)."),
+    ] = None,
+    reembed: Annotated[
+        bool, typer.Option(help="Alle Vektoren neu berechnen (z. B. nach Modellwechsel).")
+    ] = False,
+    model: Annotated[str | None, typer.Option(help="Embedding-Modell, Standard: BAAI/bge-m3.")] = None,
 ) -> None:
-    """Indexiert Ordner inkrementell (nur neue und geänderte Dateien)."""
+    """Indexiert Ordner inkrementell (nur neue und geänderte Dateien) und erzeugt Vektoren."""
     missing = [p for p in paths if not p.exists()]
     if missing:
         console.print(f"[red]Nicht gefunden:[/red] {', '.join(map(str, missing))}")
         raise typer.Exit(1)
 
     excluded = set(DEFAULT_EXCLUDED_DIRS) | set(exclude or [])
+    embedder = _load_embedder_for_index(embed, model)
     started = time.perf_counter()
     with (
         Database(db) as database,
@@ -69,9 +80,29 @@ def index(
         def on_file(info: FileInfo, status: str) -> None:
             progress.update(task, advance=1, description=f"{status:<9} {info.path.name[:50]}")
 
-        stats = index_paths(
-            database, paths, progress=on_file, excluded_dirs=excluded, max_file_mb=max_file_mb
-        )
+        embed_task = None
+
+        def on_embed(n: int, total: int) -> None:
+            nonlocal embed_task
+            if embed_task is None:
+                progress.update(task, visible=False)
+                embed_task = progress.add_task("Vektoren", total=total)
+            progress.update(embed_task, advance=n)
+
+        try:
+            stats = index_paths(
+                database,
+                paths,
+                progress=on_file,
+                excluded_dirs=excluded,
+                max_file_mb=max_file_mb,
+                embedder=embedder,
+                reembed=reembed,
+                embed_progress=on_embed,
+            )
+        except EmbeddingModelMismatchError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from exc
 
     elapsed = time.perf_counter() - started
     console.print(
@@ -79,6 +110,7 @@ def index(
         f"{stats.added} neu · {stats.updated} aktualisiert · {stats.unchanged} unverändert · "
         f"{stats.removed} entfernt · {stats.chunks} Chunks"
     )
+    _print_embed_info(stats, embedder)
     if stats.empty:
         console.print(f"[yellow]{stats.empty} Dateien ohne Text[/yellow] (z. B. gescannte PDFs → OCR folgt)")
     if stats.failed:
@@ -96,18 +128,39 @@ def search(
     ] = None,
     all_chunks: Annotated[bool, typer.Option("--chunks", help="Mehrere Treffer pro Datei zeigen.")] = False,
     as_json: Annotated[bool, typer.Option("--json", help="Ausgabe als JSON.")] = False,
+    mode: Annotated[
+        str,
+        typer.Option(
+            "--mode", "-m", help="auto | keyword | semantic | hybrid (auto = hybrid, falls möglich)"
+        ),
+    ] = "auto",
 ) -> None:
-    """Durchsucht den Index (aktuell: BM25-Stichwortsuche)."""
+    """Durchsucht den Index: Stichworte (BM25), Bedeutung (Vektoren) oder beides (hybrid)."""
     if not db.exists():
         console.print(f"[red]Kein Index unter {db}[/red] – zuerst `localrag index <ordner>` ausführen.")
         raise typer.Exit(1)
+    if mode not in ("auto", "keyword", "semantic", "hybrid"):
+        console.print(f"[red]Unbekannter Modus {mode!r}[/red]")
+        raise typer.Exit(2)
 
-    started = time.perf_counter()
     with Database(db) as database:
-        hits = keyword_search(
-            database, query, limit=limit, filetypes=filetype, one_per_document=not all_chunks
-        )
-    elapsed_ms = (time.perf_counter() - started) * 1000
+        embedder = _load_embedder_for_search(database, mode)
+        resolved = "keyword" if embedder is None else ("hybrid" if mode == "auto" else mode)
+        started = time.perf_counter()
+        try:
+            hits = run_search(
+                database,
+                query,
+                mode=resolved,  # type: ignore[arg-type]
+                embedder=embedder,
+                limit=limit,
+                filetypes=filetype,
+                one_per_document=not all_chunks,
+            )
+        except EmbeddingModelMismatchError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from exc
+        elapsed_ms = (time.perf_counter() - started) * 1000
 
     if as_json:
         payload = [
@@ -136,7 +189,50 @@ def search(
         snippet = Text("    " + h.snippet)
         snippet.highlight_words(h.matched_words, style="bold yellow", case_sensitive=False)
         console.print(snippet)
-    console.print(f"[dim]{len(hits)} Treffer in {elapsed_ms:.0f} ms (BM25)[/dim]")
+    console.print(f"[dim]{len(hits)} Treffer in {elapsed_ms:.0f} ms ({resolved})[/dim]")
+
+
+def _load_embedder_for_index(embed: bool | None, model: str | None) -> Embedder | None:
+    if embed is False:
+        return None
+    if model and model.startswith("hashing-"):
+        return load_embedder(model)
+    if not semantic_available():
+        if embed:
+            console.print("[red]Semantische Suche nicht installiert:[/red] uv sync --extra semantic")
+            raise typer.Exit(1)
+        return None
+    with console.status("Lade Embedding-Modell… (beim ersten Mal Download ~2,3 GB)"):
+        try:
+            return load_embedder(model)
+        except SemanticUnavailableError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from exc
+
+
+def _load_embedder_for_search(database: Database, mode: str) -> Embedder | None:
+    if mode == "keyword":
+        return None
+    store = VectorStore(database)
+    if not store.available or not store.model:
+        if mode in ("semantic", "hybrid"):
+            console.print("[red]Index hat keine Vektoren.[/red] Zuerst `localrag index <ordner> --embed`.")
+            raise typer.Exit(1)
+        return None
+    if not store.model.startswith("hashing-") and not semantic_available():
+        if mode in ("semantic", "hybrid"):
+            console.print("[red]Semantische Suche nicht installiert:[/red] uv sync --extra semantic")
+            raise typer.Exit(1)
+        return None
+    with console.status(f"Lade {store.model}…"):
+        return load_embedder(store.model)
+
+
+def _print_embed_info(stats: IndexStats, embedder: Embedder | None) -> None:
+    if embedder is None:
+        console.print("[dim]Ohne Vektoren (nur Stichwortsuche). Für semantische Suche: --embed[/dim]")
+    else:
+        console.print(f"[dim]{stats.embedded} neue Vektoren mit {embedder.name}[/dim]")
 
 
 @app.command()
@@ -150,6 +246,12 @@ def status(
         raise typer.Exit(0)
     with Database(db) as database:
         st = database.stats()
+        store = VectorStore(database)
+        vec_info = (
+            f"Vektoren: {st['chunks'] - store.pending_count()}/{st['chunks']} ({store.model})"
+            if store.available
+            else "Vektoren: keine (nur Stichwortsuche)"
+        )
         error_rows = database.errors() if errors else []
 
     by_status: dict[str, int] = st["by_status"]  # type: ignore[assignment]
@@ -167,6 +269,7 @@ def status(
         f"Dokumente: {sum(by_status.values())} (ok {by_status.get('ok', 0)}, ohne Text "
         f"{by_status.get('empty', 0)}, Fehler {by_status.get('error', 0)}) · Chunks: {st['chunks']}"
     )
+    console.print(vec_info)
     for path, err in error_rows:
         console.print(f"[red]✗[/red] {path}\n   [dim]{err}[/dim]")
 

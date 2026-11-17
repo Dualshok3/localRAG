@@ -19,3 +19,7 @@
 {"question": "Welches überbackene Nudelgericht hatte ich aufgeschrieben?", "expected": "lasagne_rezept.md", "type": "paraphrase"}
 {"question": "Wie setze ich das WLAN-Gerät auf Werkseinstellungen zurück?", "expected": "router_manual.md", "type": "paraphrase"}
 {"question": "Wie viel Internet habe ich auf dem Smartphone?", "expected": "handyvertrag.md", "type": "paraphrase"}
+{"question": "PF-TEST-1234", "expected": "laptop_kaufbeleg.md", "type": "exact-id"}
+{"question": "1ESY-0000-TEST", "expected": "stromrechnung_2024.md", "type": "exact-id"}
+{"question": "192.168.0.1", "expected": "router_manual.md", "type": "exact-id"}
+{"question": "2.306 EUR", "expected": "nebenkostenabrechnung_2023.md", "type": "exact-id"}

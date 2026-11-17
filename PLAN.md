@@ -255,12 +255,13 @@ RAG/
 - [x] Einfacher Chunker (fixe Größe + Überlappung)
 - [x] SQLite-Schema (`documents`, `chunks`, `chunks_fts`), deutscher Snowball-Stemmer vor dem Einfügen
 - [x] `localrag index <ordner>` und `localrag search "<frage>"` → Top-10 mit Pfad + Ausschnitt
-- [x] **Baseline festhalten:** 21 Testfragen auf synthetischem Korpus → [eval/results/bm25_baseline.md](eval/results/bm25_baseline.md)
+- [x] **Baseline festhalten:** 21 Testfragen auf synthetischem Korpus → [eval/results/latest.md](eval/results/latest.md)
 
 **1b – Semantische Suche + Hybrid**
-- [ ] bge-m3-Embeddings → `chunks_vec` (sqlite-vec)
-- [ ] Hybrid-Suche mit RRF
-- [ ] Dieselben 20 Fragen erneut → erster Vorher/Nachher-Vergleich
+- [x] bge-m3-Embeddings → `chunks_vec` (sqlite-vec), fp16 auf der GPU, Modellwechsel wird erkannt (`--reembed`)
+- [x] Hybrid-Suche mit RRF, Modi `keyword` / `semantic` / `hybrid`
+- [x] Dieselben Fragen erneut → Vorher/Nachher-Vergleich in [eval/results/latest.md](eval/results/latest.md)
+- [ ] Bekannte Schwäche: CLI lädt das Modell bei jeder Suche neu (einige Sekunden) → löst der API-Server in Phase 5
 
 **Ergebnis:** Funktionierende Hybrid-Suche in einer SQLite-Datei. Erstes Demo-GIF fürs README.
 

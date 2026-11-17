@@ -2,7 +2,7 @@
 
 > Frag deinen Computer in natürlicher Sprache – komplett lokal, mit Quellenangabe.
 
-**Status:** 🚧 Phase 1a fertig: Stichwortsuche (BM25) über PDF, DOCX, Markdown und TXT. Als Nächstes kommt die semantische Suche, siehe [PLAN.md](PLAN.md).
+**Status:** 🚧 Phase 1 fertig: Hybrid-Suche aus BM25 und Vektoren (bge-m3) über PDF, DOCX, Markdown und TXT. Als Nächstes kommen Antworten per lokalem LLM, siehe [PLAN.md](PLAN.md).
 
 ## Quickstart
 
@@ -10,26 +10,40 @@ Voraussetzung: [uv](https://docs.astral.sh/uv/).
 
 ```bash
 git clone https://github.com/Dualshok3/RAG.git && cd RAG
-uv sync
+uv sync --extra semantic                      # inkl. PyTorch/CUDA; ohne Extra: nur Stichwortsuche
 uv run localrag index "D:\Dokumente"          # inkrementell, beim zweiten Lauf nur Änderungen
-uv run localrag search "Kündigungsfrist Mietvertrag"
+uv run localrag search "Darf ich eine Katze halten?"
+uv run localrag search "PF-1234" --mode keyword   # schnell, ohne Modell
 uv run localrag status --errors
 ```
 
-Der Index liegt standardmäßig unter `~/.localrag/localrag.db`. Mit der Umgebungsvariable `LOCALRAG_DB`
-oder `--db` lässt er sich verlegen, z. B. auf eine andere Platte.
+| Variable | Bedeutung | Standard |
+|---|---|---|
+| `LOCALRAG_DB` | Index-Datenbank (auch `--db`) | `~/.localrag/localrag.db` |
+| `LOCALRAG_MODELS` | Speicherort der Modelle (~4,5 GB) | Hugging-Face-Cache |
+| `LOCALRAG_EMBEDDING_MODEL` | Embedding-Modell | `BAAI/bge-m3` |
 
-## Erste Messung: Was kann reines BM25?
+Beim ersten Start wird bge-m3 heruntergeladen. Die CLI lädt das Modell bei jeder Suche neu, das dauert
+einige Sekunden. Die Suche selbst braucht danach ~30 ms (RTX 5060 Ti). Ein dauerhaft laufender Dienst
+folgt in Phase 5.
 
-Synthetischer Testkorpus mit 10 Dokumenten und 21 Fragen ([eval/](eval/)):
+## Messung: Stichwort vs. Vektor vs. Hybrid
 
-| Fragen | n | Recall@5 | MRR |
-|---|---|---|---|
-| Stichworte aus dem Dokument | 11 | 1.00 | 1.00 |
-| Umschreibungen („Darf ich eine Katze halten?“ → *Haustiere*) | 10 | 0.00 | 0.00 |
+Synthetischer Testkorpus mit 10 Dokumenten und 25 Fragen ([eval/results/latest.md](eval/results/latest.md)):
 
-Die Umschreibungen vermeiden bewusst die Wörter aus dem Dokument. Genau diese Lücke soll die
-semantische Suche (Phase 1b) schließen. Selbst messen: `uv run python eval/run_eval.py`
+| Fragen | n | BM25 | Vektor (bge-m3) | **Hybrid (RRF)** |
+|---|---|---|---|---|
+| Stichworte aus dem Dokument | 11 | 1.00 | 1.00 | **1.00** |
+| Umschreibungen („Darf ich eine Katze halten?“ → *Haustiere*) | 10 | 0.00 | 1.00 | **0.90** |
+| Exakte Kennungen (Seriennummer, IP, Betrag) | 4 | 1.00 | 0.50 | **1.00** |
+| **Gesamt** | 25 | 0.60 | 0.92 | **0.96** |
+
+Angegeben ist Recall@1, also wie oft die richtige Datei auf Platz 1 steht. Bei Recall@5 erreichen
+Vektor und Hybrid jeweils 1.00. Das Bild ist klar: BM25 scheitert an Umschreibungen, Vektoren an exakten
+Kennungen, und Hybrid gleicht beides aus.
+
+Einschränkung: Mit 10 Dokumenten ist der Korpus klein und leicht. Ein größeres, schwierigeres Eval-Set
+ist für Phase 3 geplant. Selbst messen: `uv run python eval/run_eval.py`
 
 ## Idee
 

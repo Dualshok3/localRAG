@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from localrag.index.db import Database
-from localrag.index.text_norm import iter_tokens, query_terms, stem
+from localrag.index.text_norm import iter_tokens, stem
 
 
 @dataclass(frozen=True)
@@ -17,7 +17,7 @@ class SearchHit:
     page: int | None
     heading_path: str | None
     text: str
-    score: float  # höher = besser
+    score: float  # höher = besser; Bedeutung je nach Modus (BM25, Kosinus, RRF)
     snippet: str
     matched_words: tuple[str, ...]
 
@@ -25,6 +25,27 @@ class SearchHit:
 def build_match_query(terms: list[str]) -> str:
     # Jeder Term in Anführungszeichen → FTS5-Sonderzeichen/Operatoren in der Eingabe sind harmlos.
     return " OR ".join(f'"{t}"' for t in terms)
+
+
+def keyword_ranking(
+    db: Database, terms: list[str], *, k: int, filetypes: list[str] | None = None
+) -> list[tuple[int, float]]:
+    """(chunk_id, BM25-Score) absteigend nach Relevanz."""
+    if not terms:
+        return []
+    sql = (
+        "SELECT chunks_fts.rowid AS id, bm25(chunks_fts) AS rank FROM chunks_fts "
+        "JOIN chunks c ON c.id = chunks_fts.rowid JOIN documents d ON d.id = c.document_id "
+        "WHERE chunks_fts MATCH ?"
+    )
+    params: list[object] = [build_match_query(terms)]
+    if filetypes:
+        sql += f" AND d.filetype IN ({','.join('?' * len(filetypes))})"
+        params.extend(filetypes)
+    sql += " ORDER BY rank LIMIT ?"
+    params.append(k)
+    # FTS5-bm25 ist negativ: kleiner = besser → Vorzeichen drehen
+    return [(int(r["id"]), -float(r["rank"])) for r in db.conn.execute(sql, params)]
 
 
 def make_snippet(text: str, terms: list[str], width: int = 240) -> tuple[str, tuple[str, ...]]:
@@ -36,14 +57,12 @@ def make_snippet(text: str, terms: list[str], width: int = 240) -> tuple[str, tu
     if not hits:
         return (flat[:width] + ("…" if len(flat) > width else "")), matched
 
-    # Position im whitespace-normalisierten Text wiederfinden
     first = hits[0][0]
     pos = max(0, flat.casefold().find(first.casefold()))
     start = max(0, pos - width // 3)
     end = min(len(flat), start + width)
     if start > 0:
-        # nicht mitten im Wort beginnen
-        space = flat.find(" ", start)
+        space = flat.find(" ", start)  # nicht mitten im Wort beginnen
         start = space + 1 if 0 <= space < pos else start
     snippet = ("…" if start > 0 else "") + flat[start:end] + ("…" if end < len(flat) else "")
     return snippet, matched
@@ -57,49 +76,8 @@ def keyword_search(
     filetypes: list[str] | None = None,
     one_per_document: bool = True,
 ) -> list[SearchHit]:
-    terms = query_terms(query)
-    if not terms:
-        return []
+    from localrag.retrieval.hybrid import search
 
-    sql = (
-        "SELECT c.id, c.document_id, d.path, d.filetype, c.page, c.heading_path, c.text, "
-        "bm25(chunks_fts) AS rank "
-        "FROM chunks_fts "
-        "JOIN chunks c ON c.id = chunks_fts.rowid "
-        "JOIN documents d ON d.id = c.document_id "
-        "WHERE chunks_fts MATCH ?"
+    return search(
+        db, query, mode="keyword", limit=limit, filetypes=filetypes, one_per_document=one_per_document
     )
-    params: list[object] = [build_match_query(terms)]
-    if filetypes:
-        types = [t.lower().lstrip(".") for t in filetypes]
-        sql += f" AND d.filetype IN ({','.join('?' * len(types))})"
-        params.extend(types)
-    sql += " ORDER BY rank LIMIT ?"
-    # Bei einem Treffer pro Dokument mehr Kandidaten holen, damit nach dem Deduplizieren genug übrig sind
-    params.append(limit * 8 if one_per_document else limit)
-
-    hits: list[SearchHit] = []
-    seen_docs: set[int] = set()
-    for row in db.conn.execute(sql, params):
-        if one_per_document:
-            if row["document_id"] in seen_docs:
-                continue
-            seen_docs.add(row["document_id"])
-        snippet, matched = make_snippet(row["text"], terms)
-        hits.append(
-            SearchHit(
-                chunk_id=row["id"],
-                document_id=row["document_id"],
-                path=row["path"],
-                filetype=row["filetype"],
-                page=row["page"],
-                heading_path=row["heading_path"],
-                text=row["text"],
-                score=-float(row["rank"]),  # FTS5-bm25 ist negativ: kleiner = besser
-                snippet=snippet,
-                matched_words=matched,
-            )
-        )
-        if len(hits) >= limit:
-            break
-    return hits

@@ -9,7 +9,9 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+import sqlite_vec
+
+SCHEMA_VERSION = 2
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (
@@ -36,7 +38,8 @@ CREATE TABLE IF NOT EXISTS chunks (
     ord          INTEGER NOT NULL,
     text         TEXT NOT NULL,
     page         INTEGER,
-    heading_path TEXT
+    heading_path TEXT,
+    embedded     INTEGER NOT NULL DEFAULT 0  -- 1 = Vektor in chunks_vec vorhanden
 );
 CREATE INDEX IF NOT EXISTS idx_chunks_document ON chunks(document_id);
 
@@ -45,6 +48,10 @@ CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
     body,
     tokenize = 'unicode61 remove_diacritics 2'
 );
+"""
+
+_SCHEMA_V2_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_chunks_pending ON chunks(id) WHERE embedded = 0;
 """
 
 
@@ -76,14 +83,42 @@ class Database:
             self.path.parent.mkdir(parents=True, exist_ok=True)
         self.conn = sqlite3.connect(str(path))
         self.conn.row_factory = sqlite3.Row
+        self.conn.enable_load_extension(True)
+        sqlite_vec.load(self.conn)
+        self.conn.enable_load_extension(False)
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.execute("PRAGMA journal_mode = WAL")
         self.conn.execute("PRAGMA synchronous = NORMAL")
         self.conn.executescript(_SCHEMA)
-        self.conn.execute(
-            "INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),)
-        )
+        self._migrate()
         self.conn.commit()
+
+    def _migrate(self) -> None:
+        row = self.conn.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()
+        version = int(row[0]) if row else 0  # 0 = neue Datenbank
+        if version < 2:
+            # v2: Merker, ob ein Chunk schon einen Vektor hat
+            cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(chunks)")}
+            if "embedded" not in cols:
+                self.conn.execute("ALTER TABLE chunks ADD COLUMN embedded INTEGER NOT NULL DEFAULT 0")
+            self.conn.executescript(_SCHEMA_V2_INDEX)
+        self.set_meta("schema_version", str(SCHEMA_VERSION))
+
+    # --- Meta ----------------------------------------------------------------------------------
+
+    def get_meta(self, key: str) -> str | None:
+        row = self.conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
+        return row[0] if row else None
+
+    def set_meta(self, key: str, value: str | None) -> None:
+        if value is None:
+            self.conn.execute("DELETE FROM meta WHERE key = ?", (key,))
+        else:
+            self.conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?)", (key, value))
+
+    def has_table(self, name: str) -> bool:
+        row = self.conn.execute("SELECT 1 FROM sqlite_master WHERE name = ?", (name,)).fetchone()
+        return row is not None
 
     def close(self) -> None:
         self.conn.close()
@@ -166,12 +201,16 @@ class Database:
             c.execute("DELETE FROM documents WHERE id = ?", (row["id"],))
         return True
 
-    @staticmethod
-    def _delete_chunks(c: sqlite3.Connection, doc_id: int) -> None:
-        # FTS5-Zeilen hängen nicht am Fremdschlüssel → explizit löschen.
+    def _delete_chunks(self, c: sqlite3.Connection, doc_id: int) -> None:
+        # FTS5- und Vektor-Zeilen hängen nicht am Fremdschlüssel → explizit löschen.
         c.execute(
             "DELETE FROM chunks_fts WHERE rowid IN (SELECT id FROM chunks WHERE document_id = ?)", (doc_id,)
         )
+        if self.has_table("chunks_vec"):
+            c.execute(
+                "DELETE FROM chunks_vec WHERE rowid IN (SELECT id FROM chunks WHERE document_id = ?)",
+                (doc_id,),
+            )
         c.execute("DELETE FROM chunks WHERE document_id = ?", (doc_id,))
 
     # --- Statistik -----------------------------------------------------------------------------

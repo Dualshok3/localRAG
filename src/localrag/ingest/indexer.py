@@ -9,7 +9,9 @@ from pathlib import Path
 
 from localrag.config import DEFAULT_EXCLUDED_DIRS, DEFAULT_MAX_FILE_MB
 from localrag.index.db import ChunkInput, Database
+from localrag.index.embedder import Embedder
 from localrag.index.text_norm import normalize
+from localrag.index.vector_store import VectorStore
 from localrag.ingest.chunker import Chunk, chunk_sections
 from localrag.ingest.parsers import ParseError, parse
 from localrag.ingest.scanner import FileInfo, is_under, iter_files
@@ -27,6 +29,7 @@ class IndexStats:
     empty: int = 0
     failed: int = 0
     chunks: int = 0
+    embedded: int = 0
     errors: list[tuple[str, str]] = field(default_factory=list)
 
 
@@ -83,7 +86,11 @@ def index_paths(
     progress: ProgressCallback | None = None,
     excluded_dirs: Iterable[str] = DEFAULT_EXCLUDED_DIRS,
     max_file_mb: float = DEFAULT_MAX_FILE_MB,
+    embedder: Embedder | None = None,
+    reembed: bool = False,
+    embed_progress: Callable[[int, int], None] | None = None,
 ) -> IndexStats:
+    """Text-Index aktualisieren und – falls ein Embedder übergeben wird – fehlende Vektoren erzeugen."""
     roots = [Path(r).resolve() for r in roots]
     stats = IndexStats()
     seen: set[str] = set()
@@ -125,6 +132,18 @@ def index_paths(
         if path not in seen and any(is_under(path, r) for r in roots) and not Path(path).exists():
             db.delete_document(path)
             stats.removed += 1
+
+    if embedder is not None:
+        store = VectorStore(db)
+        if reembed:
+            store.reset()
+        store.ensure(embedder)
+        total = store.pending_count()
+        if embed_progress:
+            embed_progress(0, total)
+        stats.embedded = store.embed_pending(
+            embedder, progress=(lambda n: embed_progress(n, total)) if embed_progress else None
+        )
 
     return stats
 

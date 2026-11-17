@@ -5,20 +5,20 @@ Korpus: 16 synthetische Dokumente · 35 Fragen · Embedding-Modell: BAAI/bge-m3 
 | Modus | Fragen | n | Recall@1 | Recall@3 | Recall@5 | MRR | Latenz p50 |
 |---|---|---|---|---|---|---|---|
 | **keyword** | gesamt | 35 | 0.60 | 0.69 | 0.69 | 0.63 | 0.3 ms |
-|  | disambiguation | 5 | 0.20 | 0.80 | 0.80 | 0.43 | 0.3 ms |
-|  | exact-id | 5 | 1.00 | 1.00 | 1.00 | 1.00 | 0.3 ms |
+|  | disambiguation | 5 | 0.20 | 0.80 | 0.80 | 0.43 | 0.4 ms |
+|  | exact-id | 5 | 1.00 | 1.00 | 1.00 | 1.00 | 0.4 ms |
 |  | keyword | 12 | 1.00 | 1.00 | 1.00 | 1.00 | 0.2 ms |
 |  | paraphrase | 13 | 0.23 | 0.23 | 0.23 | 0.23 | 0.3 ms |
-| **semantic** | gesamt | 35 | 0.89 | 1.00 | 1.00 | 0.94 | 22.2 ms |
-|  | disambiguation | 5 | 1.00 | 1.00 | 1.00 | 1.00 | 22.0 ms |
-|  | exact-id | 5 | 0.40 | 1.00 | 1.00 | 0.67 | 21.9 ms |
-|  | keyword | 12 | 1.00 | 1.00 | 1.00 | 1.00 | 23.3 ms |
-|  | paraphrase | 13 | 0.92 | 1.00 | 1.00 | 0.96 | 22.1 ms |
-| **hybrid** | gesamt | 35 | 0.83 | 1.00 | 1.00 | 0.90 | 22.3 ms |
-|  | disambiguation | 5 | 0.60 | 1.00 | 1.00 | 0.73 | 22.3 ms |
-|  | exact-id | 5 | 1.00 | 1.00 | 1.00 | 1.00 | 22.1 ms |
-|  | keyword | 12 | 1.00 | 1.00 | 1.00 | 1.00 | 22.3 ms |
-|  | paraphrase | 13 | 0.69 | 1.00 | 1.00 | 0.83 | 22.9 ms |
+| **semantic** | gesamt | 35 | 0.89 | 1.00 | 1.00 | 0.94 | 22.7 ms |
+|  | disambiguation | 5 | 1.00 | 1.00 | 1.00 | 1.00 | 22.5 ms |
+|  | exact-id | 5 | 0.40 | 1.00 | 1.00 | 0.67 | 21.8 ms |
+|  | keyword | 12 | 1.00 | 1.00 | 1.00 | 1.00 | 23.1 ms |
+|  | paraphrase | 13 | 0.92 | 1.00 | 1.00 | 0.96 | 22.3 ms |
+| **hybrid** | gesamt | 35 | 0.83 | 1.00 | 1.00 | 0.90 | 22.1 ms |
+|  | disambiguation | 5 | 0.60 | 1.00 | 1.00 | 0.77 | 22.1 ms |
+|  | exact-id | 5 | 1.00 | 1.00 | 1.00 | 1.00 | 21.9 ms |
+|  | keyword | 12 | 1.00 | 1.00 | 1.00 | 1.00 | 22.2 ms |
+|  | paraphrase | 13 | 0.69 | 1.00 | 1.00 | 0.83 | 22.1 ms |
 
 ## Rang der richtigen Datei pro Frage
 
@@ -50,7 +50,7 @@ Korpus: 16 synthetische Dokumente · 35 Fragen · Embedding-Modell: BAAI/bge-m3 
 | exact-id | 192.168.0.1 | router_manual.md | 1 | 1 | 1 |
 | exact-id | 2.306 EUR | nebenkostenabrechnung_2023.md | 1 | 3 | 1 |
 | disambiguation | Wie hoch war der Stromverbrauch im Jahr 2023? | stromrechnung_2023.md | 3 | 1 | 1 |
-| disambiguation | Wie lange ist die Kündigungsfrist für die Garage? | garagenmietvertrag.md | 3 | 1 | 3 |
+| disambiguation | Wie lange ist die Kündigungsfrist für die Garage? | garagenmietvertrag.md | 3 | 1 | 2 |
 | disambiguation | Wie viele Urlaubstage hatte ich beim alten Arbeitgeber? | alter_arbeitsvertrag_2019.md | 1 | 1 | 1 |
 | disambiguation | Wie viel verdiene ich aktuell brutto? | arbeitsvertrag.md | – | 1 | 3 |
 | paraphrase | Ist mein Rad versichert, wenn es geklaut wird? | hausratversicherung.md | 1 | 1 | 1 |

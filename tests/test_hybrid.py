@@ -9,7 +9,7 @@ from localrag.index.db import Database
 from localrag.index.embedder import HashingEmbedder
 from localrag.index.vector_store import EmbeddingModelMismatchError, VectorStore
 from localrag.ingest.indexer import index_paths
-from localrag.retrieval.hybrid import rrf, search
+from localrag.retrieval.hybrid import SENTENCE_KEYWORD_WEIGHT, keyword_weight_for, rrf, search
 
 
 class SynonymEmbedder(HashingEmbedder):
@@ -184,7 +184,7 @@ def test_reranker_reorders_the_top_candidates(db: Database, tmp_path: Path):
 
     assert names(search(db, "Reparatur", mode="keyword"))[0] == "a.md"
     rr = PreferWord("Thermostat")
-    assert names(search(db, "Reparatur", mode="keyword", reranker=rr))[0] == "b.md"
+    assert names(search(db, "Reparatur", mode="keyword", reranker=rr, rerank_blend=None))[0] == "b.md"
     assert any(t.startswith("b.md") for t in rr.seen)  # Dateiname geht mit an den Reranker
 
 
@@ -197,3 +197,36 @@ def test_reranker_respects_type_filter(db: Database, tmp_path: Path):
     rr = PreferWord("Lack")
     assert names(search(db, "Thermostat", mode="keyword", reranker=rr, filetypes=["md"])) == ["a.md"]
     assert len(rr.seen) == 1
+
+
+def test_weighted_rrf_lowers_a_list():
+    fused = rrf([[1, 2], [2, 1]], weights=[0.5, 1.0])
+    assert [i for i, _ in fused] == [2, 1]  # die stärker gewichtete Liste gewinnt
+
+
+@pytest.mark.parametrize(
+    ("query", "weight"),
+    [
+        ("AB-CD 123", 1.0),  # Kennung
+        ("998877", 1.0),
+        ("Router Firmware", 1.0),  # Stichworte
+        ("Bericht_final.docx finden", 1.0),  # Dateiname
+        ("Steuererklärung Belege Frist Finanzamt Formular", 1.0),  # viele Stichworte, aber kein Satz
+        ("Mail an die Versicherung wegen des Rabatts", SENTENCE_KEYWORD_WEIGHT),  # Füllwörter → Satz
+        ("Wie viel Urlaub steht mir bei meinem Arbeitgeber zu?", SENTENCE_KEYWORD_WEIGHT),
+    ],
+)
+def test_keyword_weight_depends_on_query_type(query: str, weight: float):
+    assert keyword_weight_for(query) == weight
+
+
+def test_blended_rerank_keeps_a_clear_first_stage_winner(db: Database, tmp_path: Path):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "a.md").write_text("Reparatur Reparatur Reparatur am Fahrrad.", encoding="utf-8")
+    (docs / "b.md").write_text("Reparatur der Heizung und des Thermostats.", encoding="utf-8")
+    index_paths(db, [docs])
+    rr = PreferWord("Thermostat")
+    # Ersetzen: Reranker entscheidet allein. Mischen mit kleinem Gewicht: Platz 1 der ersten Stufe bleibt.
+    assert names(search(db, "Reparatur", mode="keyword", reranker=rr, rerank_blend=None))[0] == "b.md"
+    assert names(search(db, "Reparatur", mode="keyword", reranker=rr, rerank_blend=0.5))[0] == "a.md"

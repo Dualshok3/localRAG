@@ -140,16 +140,18 @@ def test_service_uses_reranker_when_configured(tmp_path: Path):
     with Database(db_path) as db:
         index_paths(db, [docs])
 
-    class PreferKotfluegel:
+    class Recording:
         name = "fake-reranker"
 
+        def __init__(self) -> None:
+            self.seen: list[str] = []
+
         def score(self, query, texts):
+            self.seen.extend(texts)
             return [1.0 if "Thermostat" in t else 0.0 for t in texts]
 
-    def first(app) -> str:
-        return Path(TestClient(app).get("/search", params={"q": "Reparatur"}).json()["hits"][0]["path"]).name
-
-    assert first(create_app(db_path, load_model=False)) == "a.md"
-    reranked = create_app(db_path, load_model=False, reranker=PreferKotfluegel())
-    assert first(reranked) == "b.md"
-    assert TestClient(reranked).get("/health").json()["reranker"] == "fake-reranker"
+    rr = Recording()
+    client = TestClient(create_app(db_path, load_model=False, reranker=rr))
+    assert client.get("/search", params={"q": "Reparatur"}).json()["hits"]
+    assert any("Thermostat" in t for t in rr.seen)  # Suche lief durch den Reranker
+    assert client.get("/health").json()["reranker"] == "fake-reranker"

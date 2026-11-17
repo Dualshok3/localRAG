@@ -33,7 +33,8 @@ Quellen
   Modell das, statt zu raten.
 - ⚡ **Inkrementell:** Beim zweiten Lauf werden nur geänderte Dateien neu verarbeitet.
 - 🎯 **Optionaler Reranker:** `--rerank` sortiert die Kandidaten mit einem Cross-Encoder neu, hilft bei
-  umschriebenen Fragen, kostet aber rund 0,3 s pro Suche ([Messung](#härtere-fragen-und-reranker)).
+  umschriebenen Fragen, kostet aber rund 0,3 s pro Suche
+  ([Messung](#härtere-fragen-gewichtung-und-reranker)).
 - 🚀 **Hintergrunddienst:** `localrag serve` hält das Modell geladen, Suchen dauern dann Millisekunden.
 - 🤖 **MCP-Server:** Claude Desktop, Claude Code und andere Clients können direkt in den Dateien suchen.
 - 📊 **Gemessen statt behauptet:** Ein Eval-Set vergleicht Stichwort-, Vektor- und Hybridsuche, die
@@ -153,8 +154,10 @@ Was man daraus lernt:
 - **Hybrid** ist bei Kennungen perfekt, verliert aber bei Umschreibungen Plätze. Einfaches RRF gewichtet
   beide Listen gleich. Findet BM25 nur zufällige Wortübereinstimmungen in falschen Dateien, schieben
   diese den richtigen Vektor-Treffer auf Platz 2 oder 3.
-- Hybrid bleibt der Standard, weil es nie komplett danebenliegt. Für Platz 1 gibt es inzwischen den
-  optionalen Reranker, siehe [Härtere Fragen und Reranker](#härtere-fragen-und-reranker).
+- Hybrid bleibt der Standard, weil es nie komplett danebenliegt. Inzwischen wird die BM25-Liste bei
+  ganzen Sätzen schwächer gewichtet, und es gibt einen optionalen Reranker. Auf echten Dateien hilft
+  beides, hier im synthetischen Korpus kaum, siehe
+  [Härtere Fragen, Gewichtung und Reranker](#härtere-fragen-gewichtung-und-reranker).
 
 Einschränkung: 35 Fragen sind wenig, ein bis zwei Fragen verschieben die Werte um mehrere Prozentpunkte.
 Selbst messen: `uv run python eval/run_eval.py`
@@ -188,7 +191,7 @@ nur die Zahlen. Hardware: RTX 5060 Ti 16 GB.
 | | BM25 | Vektor | Hybrid | Windows-Suche |
 |---|---|---|---|---|
 | Recall@1 | 0.79 | 0.75 | **0.79** | 0.25 |
-| Recall@5 | 0.83 | 0.92 | **0.96** | 0.25 |
+| Recall@5 | 0.83 | 0.92 | **1.00** | 0.25 |
 
 Die Windows-Suche indexiert standardmäßig nur die Benutzerordner auf C:, der Studienordner auf D: fehlt
 ihr komplett. Nur auf die Fragen zu Dateien gerechnet, die sie kennt, findet sie 6 von 13. Ganze Sätze
@@ -204,36 +207,47 @@ Der erste Durchlauf hat Schwächen aufgedeckt, die inzwischen behoben sind:
 | Leere Antwort des LLM bei unbeantwortbarer Frage | Fester Satz „Dazu habe ich in deinen Dateien nichts gefunden.“ | |
 | Kein Modell geladen → LM Studio lud ungefragt ein anderes (10 GB) | Klare Fehlermeldung statt stillem Wechsel | |
 
-Recall@5 von Hybrid stieg dadurch von 0.88 auf 0.96, gerechnet über dieselben 24 Fragen.
+Recall@5 von Hybrid stieg dadurch von 0.88 auf 0.96, gerechnet über dieselben 24 Fragen. Die
+Gewichtung (nächster Abschnitt) bringt es auf 1.00.
 
-### Härtere Fragen und Reranker
+### Härtere Fragen, Gewichtung und Reranker
 
 Die 24 Fragen oben entstanden nach dem Lesen der Dokumente und teilen deshalb oft Wörter mit ihnen, das
-begünstigt BM25. Deshalb gibt es ein zweites Set mit 12 Fragen, die bewusst andere Wörter benutzen
-(Frage und Dokument haben kein Wort gemeinsam), zwei davon
-auf Deutsch zu englischen Dokumenten. Dazu der Reranker
-[bge-reranker-v2-m3](https://huggingface.co/BAAI/bge-reranker-v2-m3), der die 40 besten Abschnitte der
-ersten Stufe zusammen mit der Frage liest:
+begünstigt BM25. Deshalb gibt es zwei weitere Sets: 12 Fragen, die bewusst andere Wörter benutzen
+(Frage und Dokument haben kein Wort gemeinsam, zwei davon auf Deutsch zu englischen Dokumenten), und 42
+gemischte Fragen zu weiteren Dokumenten (Zeugnisse, Bordkarte, E-Mails, Lernskripte). Zusammen 78.
 
-| | Recall@1 | Recall@5 | MRR | p50 |
-|---|---|---|---|---|
-| **24 Fragen** · Hybrid | 0.79 | **0.96** | 0.85 | 53 ms |
-| **24 Fragen** · Hybrid + Reranker | **0.88** | **0.96** | **0.92** | 386 ms |
-| **12 schwere** · BM25 | 0.17 | 0.33 | 0.22 | 10 ms |
-| **12 schwere** · Vektor | **0.42** | **0.67** | **0.50** | 49 ms |
-| **12 schwere** · Hybrid | 0.25 | 0.42 | 0.37 | 55 ms |
-| **12 schwere** · Hybrid + Reranker | 0.17 | **0.67** | 0.35 | 391 ms |
+| Variante | 24 alte | 12 schwere | 42 neue | **alle 78** | p50 |
+|---|---|---|---|---|---|
+| BM25 | 0.79 / 0.83 | 0.17 / 0.33 | 0.62 / 0.79 | 0.60 / 0.73 | 20 ms |
+| Vektor | 0.75 / 0.92 | 0.42 / 0.67 | 0.74 / 0.93 | 0.69 / 0.88 | 54 ms |
+| Hybrid, beide Listen gleich (vorher) | 0.79 / 0.96 | 0.25 / 0.42 | 0.71 / 0.90 | 0.67 / 0.85 | 54 ms |
+| **Hybrid, gewichtet (Standard)** | 0.79 / **1.00** | 0.33 / **0.67** | 0.76 / 0.95 | **0.71 / 0.92** | 53 ms |
+| Hybrid gewichtet + Reranker (`--rerank`) | **0.83 / 1.00** | **0.42** / 0.58 | **0.81 / 0.98** | **0.76 / 0.92** | 386 ms |
 
-Was man daraus lernt:
-- Ohne gemeinsame Wörter zieht BM25 die Hybridsuche nach unten: Vektor allein ist hier klar besser.
-- Der Reranker holt das bei Recall@5 wieder auf und verbessert bei den leichteren Fragen Platz 1, kostet
-  aber gut 0,3 s pro Suche. Bei den schweren Fragen landet die richtige Datei mit ihm öfter unter den
-  ersten fünf, aber seltener ganz oben.
-- Drei Fragen findet keine Variante: kurze E-Mails, deren Inhalt fast nur aus Platzhaltern besteht, und
-  eine Rechnung, die fast nur aus Großbuchstaben-Kürzeln besteht.
-- Deshalb ist der Reranker **optional** (`--rerank` bei `search`, `ask` und `serve`), nicht Standard. Bei
-  12 Fragen verschiebt eine einzige Frage die Werte um 8 Prozentpunkte. Für eine Standardänderung braucht
-  es mehr Fragen.
+Werte: Recall@1 / Recall@5. MRR über alle 78: Vektor 0.76, Hybrid vorher 0.75, gewichtet 0.79, mit
+Reranker 0.84.
+
+**Gewichtung nach Art der Anfrage.** Bei ganzen Sätzen findet BM25 viele Zufallstreffer über
+Allerweltswörter und schiebt den richtigen Vektortreffer nach unten. Deshalb zählt die BM25-Liste bei
+Sätzen nur noch 0.3-fach, erkannt an Füllwörtern wie „ich“, „der“, „wann“ oder einem Fragezeichen. Bei
+Kennungen und Stichworten („WTEST-998877“, „Router Firmware“) zählt sie weiter voll. Das kostet keine
+Zeit und schlägt beide Einzelverfahren. Getestet wurden auch feste Gewichte 0.5 und 0.3 für alle
+Anfragen: Sie verlieren Kennungen wie Buchungs- und Auftragsnummern, die nur BM25 findet.
+
+**Reranker.** [bge-reranker-v2-m3](https://huggingface.co/BAAI/bge-reranker-v2-m3) liest die 40 besten
+Abschnitte zusammen mit der Frage. Seine Reihenfolge wird mit der der ersten Stufe gemischt statt sie zu
+ersetzen. Reines Ersetzen ergab bei den schweren Fragen Recall@1 0.25 statt 0.42, weil richtige Treffer
+von Platz 1 verdrängt wurden. Der Reranker bringt vor allem Platz 1 (0.71 → 0.76), kostet aber gut 0,3 s
+pro Suche und bleibt deshalb optional.
+
+Was keine Variante findet: zwei kurze E-Mails, deren Text fast nur aus Platzhaltern besteht und deren
+Thema in einer Abkürzung steckt („SF-Klasse“ für Schadenfreiheitsrabatt). Außerdem die
+Rechnung, die fast nur aus Großbuchstaben-Kürzeln besteht.
+
+Einschränkung: Im synthetischen Korpus oben ändert die Gewichtung nichts (Hybrid Recall@1 bleibt 0.83).
+Dort hat BM25 falsche Dateien oft auf Platz 1, die gleichzeitig auf Vektor-Platz 2 liegen. Das reicht in
+RRF auch mit Gewicht 0.3 noch für den ersten Platz.
 
 ## Architektur
 
@@ -252,8 +266,8 @@ flowchart LR
 | Chunking | Absätze zu ~350 Wörtern packen, 50 Wörter Überlappung, Überschriftenpfad merken | [chunker.py](src/localrag/ingest/chunker.py) |
 | Stichwortindex | FTS5 mit BM25, Text vorab per Snowball auf Wortstämme reduziert | [text_norm.py](src/localrag/index/text_norm.py) |
 | Vektorindex | bge-m3 (1024 Dim., fp16 auf CUDA), normalisiert in sqlite-vec | [vector_store.py](src/localrag/index/vector_store.py) |
-| Fusion | Reciprocal Rank Fusion (k = 60) über beide Trefferlisten | [hybrid.py](src/localrag/retrieval/hybrid.py) |
-| Reranking (optional) | bge-reranker-v2-m3 liest Frage + Abschnitt gemeinsam, sortiert die Top 40 neu | [reranker.py](src/localrag/retrieval/reranker.py) |
+| Fusion | Reciprocal Rank Fusion (k = 60), BM25-Liste bei ganzen Sätzen 0.3-fach gewichtet | [hybrid.py](src/localrag/retrieval/hybrid.py) |
+| Reranking (optional) | bge-reranker-v2-m3 liest Frage + Abschnitt gemeinsam, Rang wird mit der ersten Stufe gemischt | [reranker.py](src/localrag/retrieval/reranker.py) |
 | Antwort | Prompt nur mit Quellen, Zitatpflicht, Schutz vor Anweisungen in Dokumenten | [prompts.py](src/localrag/generation/prompts.py) |
 
 ## Geplant

@@ -1,0 +1,23 @@
+repos:
+  # Sucht nach Passwörtern, API-Keys, Tokens usw.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.24.2
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+      - id: detect-private-key
+      - id: check-merge-conflict
+
+  # Eigener Schutz: keine echten Dokumente, Indizes oder .env-Dateien
+  - repo: local
+    hooks:
+      - id: block-private-files
+        name: Keine privaten Dokumente/Indizes committen
+        entry: python scripts/check_private_files.py
+        language: system
+        pass_filenames: true

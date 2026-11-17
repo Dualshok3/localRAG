@@ -221,3 +221,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# LocalRAG: private data & index
+data/
+index/
+*.lance/
+models/
+private/
+.lancedb/
+*.db
+*.sqlite
+*.sqlite3
+config.local.*

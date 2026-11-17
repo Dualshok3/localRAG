@@ -33,9 +33,19 @@ funktioniert ebenso (llama.cpp, vLLM, Ollama).
 
 ```bash
 lms server start                     # LM-Studio-Server
-lms load qwen3.5-9b                  # oder ein anderes Modell
+lms load gemma-4-26b-a4b-it          # oder ein anderes Modell
 uv run localrag ask "Wie hoch ist der neue Stromabschlag?"
 ```
+
+Stichprobe mit 4 Fragen auf einer RTX 5060 Ti (16 GB): Beide Modelle antworten in rund 3 s.
+
+| Modell | richtig | Auffälligkeit |
+|---|---|---|
+| Qwen3.5-9B | 3/4 | „Darf ich eine Katze halten?“ → „Ja“, weil es die Katze als „Kleintier in Käfigen“ einordnet |
+| **Gemma 4 26B-A4B** (MoE) | **4/4** | nennt korrekt die Bedingung: Zustimmung des Vermieters |
+
+Die Suche lieferte in beiden Fällen die richtige Klausel. Der Fehler liegt also beim Schlussfolgern des
+kleineren Modells, nicht beim Retrieval.
 
 Das Modell bekommt nur die gefundenen Textstellen und soll jede Aussage mit `[n]` belegen. Steht die
 Antwort nicht in den Quellen, sagt es „Dazu habe ich in deinen Dateien nichts gefunden.“

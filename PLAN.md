@@ -268,7 +268,7 @@ RAG/
 ### Phase 2 – Antworten generieren (3–4 Tage)
 - [x] LM-Studio-Anbindung (OpenAI-kompatibel, Streaming, `<think>`-Filter), Prompt mit nummerierten Quellen `[1] [2]`
 - [x] `localrag ask "<frage>"` mit Streaming-Ausgabe und Zitaten
-- [ ] Antwortqualität messen: erster Live-Test mit Qwen3.5-9B: 2 von 3 korrekt, eine Klausel falsch gelesen (Katze/Haustiere). Antwortzeit 8–56 s, Ursache noch offen (kein Reasoning)
+- [ ] Antwortqualität messen (systematisch in Phase 3). Stichprobe mit 4 Fragen: Qwen3.5-9B 3/4, die Haustier-Ausnahme wird falsch auf die Katze angewendet, ein Prompt-Hinweis hilft nicht. Gemma 4 26B-A4B 4/4. Beide brauchen ~3 s, ~2,5 s davon bis zum ersten Token. Die früheren 8–56 s ließen sich im Eval-Korpus nicht reproduzieren, vermutlich Kaltstart
 - [ ] „Ich weiß es nicht“-Verhalten, wenn nichts Relevantes gefunden wird
 
 **Ergebnis:** Echter RAG – Frage rein, Antwort mit Quellen raus.

@@ -115,3 +115,41 @@ def test_ask_reports_llm_errors_as_event(indexed: Path):
     svc = ServiceClient("http://testserver", transport=Bridge(test_client))
     events = list(svc.ask("Kündigungsfrist"))
     assert events[-1]["type"] == "error" and "lms server start" in events[-1]["message"]
+
+
+def test_open_connection_sees_files_indexed_later(indexed: Path, tmp_path: Path):
+    client, _ = make_service(indexed, with_vectors=False)
+    assert client.get("/search", params={"q": "Zitronenfalter"}).json()["hits"] == []
+
+    extra = tmp_path / "neu"
+    extra.mkdir()
+    (extra / "garten.md").write_text("Im Garten flog ein Zitronenfalter.", encoding="utf-8")
+    with Database(indexed) as db:  # wie ein zweiter Prozess, der während des Dienstes indexiert
+        index_paths(db, [extra])
+
+    hits = client.get("/search", params={"q": "Zitronenfalter"}).json()["hits"]
+    assert [Path(h["path"]).name for h in hits] == ["garten.md"]
+
+
+def test_service_uses_reranker_when_configured(tmp_path: Path):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "a.md").write_text("Reparatur Reparatur Reparatur am Fahrrad.", encoding="utf-8")
+    (docs / "b.md").write_text("Reparatur der Heizung und des Thermostats.", encoding="utf-8")
+    db_path = tmp_path / "rr.db"
+    with Database(db_path) as db:
+        index_paths(db, [docs])
+
+    class PreferKotfluegel:
+        name = "fake-reranker"
+
+        def score(self, query, texts):
+            return [1.0 if "Thermostat" in t else 0.0 for t in texts]
+
+    def first(app) -> str:
+        return Path(TestClient(app).get("/search", params={"q": "Reparatur"}).json()["hits"][0]["path"]).name
+
+    assert first(create_app(db_path, load_model=False)) == "a.md"
+    reranked = create_app(db_path, load_model=False, reranker=PreferKotfluegel())
+    assert first(reranked) == "b.md"
+    assert TestClient(reranked).get("/health").json()["reranker"] == "fake-reranker"

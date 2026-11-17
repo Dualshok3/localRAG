@@ -279,12 +279,12 @@ RAG/
 - [ ] Metriken: **Recall@5, Recall@10, MRR**, Latenz p50/p95; für Antworten: Faithfulness (LLM-as-Judge)
 - [ ] Experimente, jeweils mit Zahlen im README:
   1. nur Vektor vs. nur BM25 vs. **Hybrid (RRF)**
-  2. ohne vs. **mit Reranker**
+  2. ohne vs. **mit Reranker** ✅ *(echte Dateien: 24 Fragen Recall@1 0,79 → 0,88; 12 Fragen ohne gemeinsame Wörter Recall@5 0,42 → 0,67, Recall@1 aber 0,25 → 0,17; +0,33 s pro Suche → optional per `--rerank`)*
   3. Chunkgrößen 256 / 512 / 1024
   4. mit vs. ohne `heading_path`-Kontext
   5. Embedding-Modelle im Vergleich
 - [x] **Benchmark gegen Windows-Suche** auf denselben Fragen (Wie oft ist die richtige Datei in den Top 5?)
-  *(echte Dateien, 24 Fragen: Hybrid Recall@5 0,96 gegenüber Windows-Suche 0,25. Die Windows-Suche kennt D: nicht und scheitert an ganzen Sätzen. Aus dem Test umgesetzt: OCR für Scans, Duplikate zusammenfassen, DOCX-Notfallparser. Offen: Fragen ohne gemeinsame Wörter ins Set aufnehmen, Kürzel-Dokumente)*
+  *(echte Dateien, 24 Fragen: Hybrid Recall@5 0,96 gegenüber Windows-Suche 0,25. Die Windows-Suche kennt D: nicht und scheitert an ganzen Sätzen. Aus dem Test umgesetzt: OCR für Scans, Duplikate zusammenfassen, DOCX-Notfallparser. Dazu ein zweites Set mit 12 Fragen ohne gemeinsame Wörter: dort Vektor 0,67 vor Hybrid 0,42. Offen: Kürzel-Dokumente, Mails aus fast nur Platzhaltern, gewichtetes RRF)*
 
 **Ergebnis:** Eine Tabelle wie „Hybrid + Rerank: Recall@5 = 0,91 vs. Windows-Suche 0,34“ – genau so etwas
 überzeugt beim Lesen eines GitHub-Profils.

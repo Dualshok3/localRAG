@@ -159,3 +159,41 @@ def test_v1_database_is_migrated(tmp_path: Path):
     with Database(path) as db:
         assert db.get_meta("schema_version") == "2"
         assert VectorStore(db).pending_count() == 1
+
+
+class PreferWord:
+    """Fake-Reranker: Abschnitte mit einem bestimmten Wort gewinnen."""
+
+    name = "fake-reranker"
+
+    def __init__(self, word: str) -> None:
+        self.word = word
+        self.seen: list[str] = []
+
+    def score(self, query: str, texts):
+        self.seen = list(texts)
+        return [1.0 if self.word in t else 0.0 for t in texts]
+
+
+def test_reranker_reorders_the_top_candidates(db: Database, tmp_path: Path):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "a.md").write_text("Reparatur Reparatur Reparatur am Fahrrad.", encoding="utf-8")
+    (docs / "b.md").write_text("Reparatur der Heizung und des Thermostats.", encoding="utf-8")
+    index_paths(db, [docs])
+
+    assert names(search(db, "Reparatur", mode="keyword"))[0] == "a.md"
+    rr = PreferWord("Thermostat")
+    assert names(search(db, "Reparatur", mode="keyword", reranker=rr))[0] == "b.md"
+    assert any(t.startswith("b.md") for t in rr.seen)  # Dateiname geht mit an den Reranker
+
+
+def test_reranker_respects_type_filter(db: Database, tmp_path: Path):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "a.md").write_text("Thermostat Reparatur", encoding="utf-8")
+    (docs / "b.txt").write_text("Thermostat Reparatur Heizung", encoding="utf-8")
+    index_paths(db, [docs])
+    rr = PreferWord("Lack")
+    assert names(search(db, "Thermostat", mode="keyword", reranker=rr, filetypes=["md"])) == ["a.md"]
+    assert len(rr.seen) == 1

@@ -29,6 +29,7 @@ from localrag.ingest.indexer import IndexStats, index_paths
 from localrag.ingest.ocr import OcrUnavailableError, load_ocr
 from localrag.ingest.scanner import FileInfo
 from localrag.retrieval.hybrid import search as run_search
+from localrag.retrieval.reranker import CrossEncoderReranker, Reranker
 
 # Windows-Konsolen nutzen teils noch cp1252 → Umlaute/Sonderzeichen nie mit Absturz quittieren.
 for _stream in (sys.stdout, sys.stderr):
@@ -47,12 +48,34 @@ LocalOption = Annotated[
 ]
 
 
+RerankOption = Annotated[
+    bool,
+    typer.Option(
+        "--rerank",
+        help="Treffer mit einem Cross-Encoder (bge-reranker-v2-m3) neu sortieren: besser bei Umschreibungen, "
+        "aber ~0,3 s langsamer.",
+    ),
+]
+
+
+def _load_reranker(rerank: bool) -> Reranker | None:
+    if not rerank:
+        return None
+    try:
+        with console.status("Lade Reranker…"):
+            return CrossEncoderReranker()
+    except SemanticUnavailableError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+
+
 @app.command()
 def serve(
     db: DbOption,
     host: Annotated[str, typer.Option(help="Adresse. Nur 127.0.0.1 ist privat!")] = DEFAULT_HOST,
     port: Annotated[int, typer.Option(help="Port.")] = DEFAULT_PORT,
     no_model: Annotated[bool, typer.Option("--no-model", help="Ohne Embedding-Modell (nur BM25).")] = False,
+    rerank: RerankOption = False,
 ) -> None:
     """Startet den lokalen Dienst: Modell bleibt geladen, `search`/`ask` antworten dann sofort."""
     import uvicorn
@@ -67,8 +90,10 @@ def serve(
         console.print(f"[red]Kein Index unter {db}[/red] – zuerst `localrag index <ordner>` ausführen.")
         raise typer.Exit(1)
     with console.status("Lade Embedding-Modell…"):
-        application = create_app(db, load_model=not no_model)
+        application = create_app(db, load_model=not no_model, reranker=_load_reranker(rerank))
     model = application.state.embedder.name if application.state.embedder else "keins (nur BM25)"
+    if application.state.reranker:
+        model += f" + {application.state.reranker.name}"
     console.print(f"[green]LocalRAG-Dienst[/green] auf http://{host}:{port} · Modell: {model} · Index: {db}")
     console.print("[dim]Beenden mit Strg+C[/dim]")
     uvicorn.run(application, host=host, port=port, log_level="warning")
@@ -212,6 +237,7 @@ def search(
         ),
     ] = "auto",
     local: LocalOption = False,
+    rerank: RerankOption = False,
 ) -> None:
     """Durchsucht den Index: Stichworte (BM25), Bedeutung (Vektoren) oder beides (hybrid)."""
     if not db.exists():
@@ -221,7 +247,8 @@ def search(
         console.print(f"[red]Unbekannter Modus {mode!r}[/red]")
         raise typer.Exit(2)
 
-    service = None if local else _service_for(db)
+    # Der Dienst rerankt nur, wenn er mit --rerank gestartet wurde → bei --rerank lokal arbeiten
+    service = None if (local or rerank) else _service_for(db)
     if service is not None:
         try:
             with service:
@@ -235,6 +262,7 @@ def search(
     else:
         with Database(db) as database:
             embedder = _load_embedder_for_search(database, mode)
+            reranker = _load_reranker(rerank)
             resolved = "keyword" if embedder is None else ("hybrid" if mode == "auto" else mode)
             started = time.perf_counter()
             try:
@@ -246,11 +274,14 @@ def search(
                     limit=limit,
                     filetypes=filetype,
                     one_per_document=not all_chunks,
+                    reranker=reranker,
                 )
             except EmbeddingModelMismatchError as exc:
                 console.print(f"[red]{exc}[/red]")
                 raise typer.Exit(1) from exc
             elapsed_ms = (time.perf_counter() - started) * 1000
+            if reranker is not None:
+                resolved += " + rerank"
 
     if as_json:
         payload = [
@@ -306,6 +337,7 @@ def ask(
         bool, typer.Option("--show-context", help="Alle übergebenen Textstellen zeigen.")
     ] = False,
     local: LocalOption = False,
+    rerank: RerankOption = False,
 ) -> None:
     """Beantwortet eine Frage aus deinen Dateien – mit Quellenangaben (lokales LLM, z. B. LM Studio)."""
     if not db.exists():
@@ -316,7 +348,7 @@ def ask(
         raise typer.Exit(2)
 
     # Der Dienst nutzt seine eigene LLM-Konfiguration → bei explizitem --llm-url lokal arbeiten
-    service = None if (local or llm_url) else _service_for(db)
+    service = None if (local or llm_url or rerank) else _service_for(db)
     if service is not None:
         with service:
             result, resolved, search_ms, answer_s, model_name = _ask_via_service(
@@ -339,6 +371,7 @@ def ask(
             raise typer.Exit(1) from exc
 
         embedder = _load_embedder_for_search(database, mode)
+        reranker = _load_reranker(rerank)
         resolved = "keyword" if embedder is None else ("hybrid" if mode == "auto" else mode)
         started = time.perf_counter()
         sources = retrieve_sources(
@@ -348,6 +381,7 @@ def ask(
             mode=resolved,
             k=k,
             filetypes=filetype,  # type: ignore[arg-type]
+            reranker=reranker,
         )
         search_ms = (time.perf_counter() - started) * 1000
         result = AnswerResult(question=question, sources=sources)

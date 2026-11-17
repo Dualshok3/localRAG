@@ -34,6 +34,7 @@ from localrag.index.embedder import Embedder, load_embedder, semantic_available
 from localrag.index.vector_store import EmbeddingModelMismatchError, VectorStore
 from localrag.retrieval.hybrid import search
 from localrag.retrieval.keyword import SearchHit
+from localrag.retrieval.reranker import Reranker
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
@@ -84,6 +85,7 @@ def create_app(
     embedder: Embedder | None = None,
     load_model: bool = True,
     llm_factory: Callable[[str | None], ChatClient] | None = None,
+    reranker: Reranker | None = None,
 ) -> FastAPI:
     db_path = Path(db_path).resolve()
     if embedder is None and load_model:
@@ -92,8 +94,19 @@ def create_app(
     # Ein Modell auf der GPU, viele Anfragen in Threads → Zugriff serialisieren
     model_lock = threading.Lock()
 
+    # Eine Verbindung je Worker-Thread statt einer pro Anfrage: Öffnen lädt sqlite-vec und prüft das
+    # Schema (ein kurzer Schreibvorgang) – das kostete bei jeder Suche spürbar Zeit.
+    local = threading.local()
+
+    def connection() -> Database:
+        db: Database | None = getattr(local, "db", None)
+        if db is None:
+            db = local.db = Database(db_path)
+        return db
+
     app = FastAPI(title="LocalRAG", version=__version__)
     app.state.embedder = embedder
+    app.state.reranker = reranker
     app.state.db_path = db_path
 
     def resolved_mode(mode: str) -> str:
@@ -111,6 +124,7 @@ def create_app(
             "db": str(db_path),
             "db_exists": db_path.exists(),
             "embedding_model": embedder.name if embedder else None,
+            "reranker": reranker.name if reranker else None,
         }
 
     @app.get("/search")
@@ -124,15 +138,16 @@ def create_app(
         resolved = resolved_mode(mode)
         started = time.perf_counter()
         try:
-            with model_lock, Database(db_path) as db:
+            with model_lock:
                 hits = search(
-                    db,
+                    connection(),
                     q,
                     mode=resolved,  # type: ignore[arg-type]
                     embedder=embedder,
                     limit=limit,
                     filetypes=type,
                     one_per_document=not chunks,
+                    reranker=reranker,
                 )
         except EmbeddingModelMismatchError as exc:
             raise HTTPException(409, str(exc)) from exc
@@ -146,14 +161,15 @@ def create_app(
     def ask_endpoint(req: AskRequest) -> StreamingResponse:
         resolved = resolved_mode(req.mode)
         started = time.perf_counter()
-        with model_lock, Database(db_path) as db:
+        with model_lock:
             sources = retrieve_sources(
-                db,
+                connection(),
                 req.question,
                 embedder=embedder,
                 mode=resolved,  # type: ignore[arg-type]
                 k=req.k,
                 filetypes=req.types,
+                reranker=reranker,
             )
         search_ms = (time.perf_counter() - started) * 1000
 

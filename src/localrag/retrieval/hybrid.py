@@ -16,9 +16,11 @@ from localrag.index.embedder import Embedder
 from localrag.index.text_norm import query_terms
 from localrag.index.vector_store import VectorStore
 from localrag.retrieval.keyword import SearchHit, keyword_ranking, make_snippet
+from localrag.retrieval.reranker import Reranker
 
 Mode = Literal["auto", "keyword", "semantic", "hybrid"]
 RRF_K = 60
+RERANK_DEPTH = 40  # so viele Abschnitte der ersten Stufe liest der Reranker
 
 
 def rrf(rankings: Sequence[Sequence[int]], k: int = RRF_K) -> list[tuple[int, float]]:
@@ -48,6 +50,8 @@ def search(
     one_per_document: bool = True,
     candidates: int = 50,
     collapse_duplicates: bool = True,
+    reranker: Reranker | None = None,
+    rerank_depth: int = RERANK_DEPTH,
 ) -> list[SearchHit]:
     resolved = resolve_mode(db, mode, embedder)
     if resolved in ("semantic", "hybrid") and embedder is None:
@@ -80,11 +84,15 @@ def search(
         fused = rrf([[i for i, _ in keyword_ranked], [i for i, _ in vector_ranked]])
 
     rows = _fetch_chunks(db, [i for i, _ in fused])
+    if types:
+        fused = [(i, s) for i, s in fused if i in rows and rows[i]["filetype"] in types]
+    if reranker is not None and fused:
+        fused = _rerank(reranker, query, fused, rows, rerank_depth)
     kept: list[tuple[int, float, dict, frozenset[str], list[str]]] = []
     seen_docs: set[int] = set()
     for chunk_id, score in fused:
         row = rows.get(chunk_id)
-        if row is None or (types and row["filetype"] not in types):
+        if row is None:
             continue
         if one_per_document and row["document_id"] in seen_docs:
             continue
@@ -122,6 +130,25 @@ def search(
             )
         )
     return results
+
+
+def _rerank(
+    reranker: Reranker, query: str, fused: list[tuple[int, float]], rows: dict[int, dict], depth: int
+) -> list[tuple[int, float]]:
+    """Spitze der Liste neu bewerten; der Rest bleibt in alter Reihenfolge dahinter."""
+    head = [(i, s) for i, s in fused[:depth] if i in rows]
+    if not head:
+        return fused
+    scores = reranker.score(query, [_rerank_text(rows[i]) for i, _ in head])
+    reranked = sorted(zip((i for i, _ in head), scores, strict=True), key=lambda x: x[1], reverse=True)
+    return reranked + fused[depth:]
+
+
+def _rerank_text(row: dict) -> str:
+    """Dateiname und Überschrift mitgeben – sie tragen oft das Thema, das im Abschnitt fehlt."""
+    name = row["path"].replace("\\", "/").rsplit("/", 1)[-1]
+    head = f"{name} – {row['heading_path']}" if row["heading_path"] else name
+    return head + "\n" + row["text"]
 
 
 _WORD = re.compile(r"[^\W_]+")

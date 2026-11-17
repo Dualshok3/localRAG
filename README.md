@@ -32,13 +32,15 @@ Quellen
 - 💬 **Antworten mit Zitaten:** Jede Aussage ist mit `[n]` belegt. Steht nichts in den Dateien, sagt das
   Modell das, statt zu raten.
 - ⚡ **Inkrementell:** Beim zweiten Lauf werden nur geänderte Dateien neu verarbeitet.
+- 🎯 **Optionaler Reranker:** `--rerank` sortiert die Kandidaten mit einem Cross-Encoder neu, hilft bei
+  umschriebenen Fragen, kostet aber rund 0,3 s pro Suche ([Messung](#härtere-fragen-und-reranker)).
 - 🚀 **Hintergrunddienst:** `localrag serve` hält das Modell geladen, Suchen dauern dann Millisekunden.
 - 🤖 **MCP-Server:** Claude Desktop, Claude Code und andere Clients können direkt in den Dateien suchen.
 - 📊 **Gemessen statt behauptet:** Ein Eval-Set vergleicht Stichwort-, Vektor- und Hybridsuche, die
   Ergebnisse stehen [weiter unten](#messung-stichwort-vs-vektor-vs-hybrid).
 
 Formate: PDF (gescannte PDFs per OCR, unter Windows ohne Zusatzsoftware), DOCX, Markdown, TXT. Weitere
-Formate und ein Reranker sind geplant, siehe [PLAN.md](PLAN.md).
+Formate sind geplant, siehe [PLAN.md](PLAN.md).
 
 ## Quickstart
 
@@ -151,8 +153,8 @@ Was man daraus lernt:
 - **Hybrid** ist bei Kennungen perfekt, verliert aber bei Umschreibungen Plätze. Einfaches RRF gewichtet
   beide Listen gleich. Findet BM25 nur zufällige Wortübereinstimmungen in falschen Dateien, schieben
   diese den richtigen Vektor-Treffer auf Platz 2 oder 3.
-- Hybrid bleibt der Standard, weil es nie komplett danebenliegt. Für Platz 1 ist der nächste Schritt ein
-  Reranker (Phase 3), der die Top-Kandidaten noch einmal genau bewertet.
+- Hybrid bleibt der Standard, weil es nie komplett danebenliegt. Für Platz 1 gibt es inzwischen den
+  optionalen Reranker, siehe [Härtere Fragen und Reranker](#härtere-fragen-und-reranker).
 
 Einschränkung: 35 Fragen sind wenig, ein bis zwei Fragen verschieben die Werte um mehrere Prozentpunkte.
 Selbst messen: `uv run python eval/run_eval.py`
@@ -203,12 +205,34 @@ Der erste Durchlauf hat Schwächen aufgedeckt, die inzwischen behoben sind:
 
 Recall@5 von Hybrid stieg dadurch von 0.88 auf 0.96, gerechnet über dieselben 24 Fragen.
 
-Noch offen:
-- **Kürzel-Dokumente:** Rechnungen aus Großbuchstaben-Kürzeln findet keine
-  Methode über eine umschriebene Frage. Ein Reranker könnte helfen.
-- **Einschränkung:** Die Fragen entstanden nach dem Lesen der Dokumente und teilen deshalb oft Wörter mit
-  ihnen. Das begünstigt BM25. Im synthetischen Korpus mit härteren Umschreibungen ist die Vektorsuche
-  klar überlegen.
+### Härtere Fragen und Reranker
+
+Die 24 Fragen oben entstanden nach dem Lesen der Dokumente und teilen deshalb oft Wörter mit ihnen, das
+begünstigt BM25. Deshalb gibt es ein zweites Set mit 12 Fragen, die bewusst andere Wörter benutzen
+(Frage und Dokument haben kein Wort gemeinsam), zwei davon
+auf Deutsch zu englischen Dokumenten. Dazu der Reranker
+[bge-reranker-v2-m3](https://huggingface.co/BAAI/bge-reranker-v2-m3), der die 40 besten Abschnitte der
+ersten Stufe zusammen mit der Frage liest:
+
+| | Recall@1 | Recall@5 | MRR | p50 |
+|---|---|---|---|---|
+| **24 Fragen** · Hybrid | 0.79 | **0.96** | 0.85 | 53 ms |
+| **24 Fragen** · Hybrid + Reranker | **0.88** | **0.96** | **0.92** | 386 ms |
+| **12 schwere** · BM25 | 0.17 | 0.33 | 0.22 | 10 ms |
+| **12 schwere** · Vektor | **0.42** | **0.67** | **0.50** | 49 ms |
+| **12 schwere** · Hybrid | 0.25 | 0.42 | 0.37 | 55 ms |
+| **12 schwere** · Hybrid + Reranker | 0.17 | **0.67** | 0.35 | 391 ms |
+
+Was man daraus lernt:
+- Ohne gemeinsame Wörter zieht BM25 die Hybridsuche nach unten: Vektor allein ist hier klar besser.
+- Der Reranker holt das bei Recall@5 wieder auf und verbessert bei den leichteren Fragen Platz 1, kostet
+  aber gut 0,3 s pro Suche. Bei den schweren Fragen landet die richtige Datei mit ihm öfter unter den
+  ersten fünf, aber seltener ganz oben.
+- Drei Fragen findet keine Variante: kurze E-Mails, deren Inhalt fast nur aus Platzhaltern besteht, und
+  eine Rechnung, die fast nur aus Großbuchstaben-Kürzeln besteht.
+- Deshalb ist der Reranker **optional** (`--rerank` bei `search`, `ask` und `serve`), nicht Standard. Bei
+  12 Fragen verschiebt eine einzige Frage die Werte um 8 Prozentpunkte. Für eine Standardänderung braucht
+  es mehr Fragen.
 
 ## Architektur
 
@@ -218,7 +242,7 @@ flowchart LR
     E --> V[(SQLite sqlite-vec)]
     C --> B[(SQLite FTS5)]
     Q[Frage] --> V & B --> R[RRF] --> L[LLM via LM Studio] --> A[Antwort + Zitate]
-    R -.-> RR[Reranker, geplant] -.-> L
+    R -.-> RR[Reranker, optional] -.-> L
 ```
 
 | Schritt | Umsetzung | Code |
@@ -228,11 +252,12 @@ flowchart LR
 | Stichwortindex | FTS5 mit BM25, Text vorab per Snowball auf Wortstämme reduziert | [text_norm.py](src/localrag/index/text_norm.py) |
 | Vektorindex | bge-m3 (1024 Dim., fp16 auf CUDA), normalisiert in sqlite-vec | [vector_store.py](src/localrag/index/vector_store.py) |
 | Fusion | Reciprocal Rank Fusion (k = 60) über beide Trefferlisten | [hybrid.py](src/localrag/retrieval/hybrid.py) |
+| Reranking (optional) | bge-reranker-v2-m3 liest Frage + Abschnitt gemeinsam, sortiert die Top 40 neu | [reranker.py](src/localrag/retrieval/reranker.py) |
 | Antwort | Prompt nur mit Quellen, Zitatpflicht, Schutz vor Anweisungen in Dokumenten | [prompts.py](src/localrag/generation/prompts.py) |
 
 ## Geplant
 
-Reranker (bge-reranker-v2-m3) · Excel, PowerPoint, E-Mails · OCR für Bilddateien und andere
+Excel, PowerPoint, E-Mails · OCR für Bilddateien und andere
 Betriebssysteme · Dateiüberwachung · Web-Oberfläche. Reihenfolge und Begründung stehen in [PLAN.md](PLAN.md).
 
 ## Keine privaten Daten im Repo

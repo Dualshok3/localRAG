@@ -12,6 +12,7 @@ from localrag.index.db import Database
 from localrag.index.embedder import Embedder
 from localrag.retrieval.hybrid import Mode, search
 from localrag.retrieval.keyword import SearchHit
+from localrag.retrieval.reranker import Reranker
 
 _CITATION_RE = re.compile(r"\[(\d{1,2})\]")
 
@@ -50,10 +51,18 @@ def retrieve_sources(
     mode: Mode = "auto",
     k: int = 6,
     filetypes: list[str] | None = None,
+    reranker: Reranker | None = None,
 ) -> list[SearchHit]:
     # Mehrere Abschnitte derselben Datei sind hier erwünscht (z. B. Kapitel 3 und 5 eines Vertrags)
     hits = search(
-        db, question, mode=mode, embedder=embedder, limit=k, filetypes=filetypes, one_per_document=False
+        db,
+        question,
+        mode=mode,
+        embedder=embedder,
+        limit=k,
+        filetypes=filetypes,
+        one_per_document=False,
+        reranker=reranker,
     )
     return select_context(hits)
 

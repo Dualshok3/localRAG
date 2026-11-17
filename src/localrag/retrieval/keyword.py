@@ -20,6 +20,8 @@ class SearchHit:
     score: float  # höher = besser; Bedeutung je nach Modus (BM25, Kosinus, RRF)
     snippet: str
     matched_words: tuple[str, ...]
+    # Pfade weiterer Dateien mit (fast) gleichem Abschnitt, z. B. Backups oder PDF + DOCX derselben Datei
+    duplicates: tuple[str, ...] = ()
 
 
 def build_match_query(terms: list[str]) -> str:

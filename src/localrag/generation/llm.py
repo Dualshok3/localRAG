@@ -105,13 +105,13 @@ class ChatClient:
         data = self._get_json(f"{self.base_url}/models")
         return [m["id"] for m in data.get("data", [])]
 
-    def _loaded_lmstudio_models(self) -> list[str]:
-        """LM Studio kennt zusätzlich /api/v0/models mit Ladezustand. Andere Server: leere Liste."""
+    def _loaded_lmstudio_models(self) -> list[str] | None:
+        """LM Studio kennt zusätzlich /api/v0/models mit Ladezustand. Andere Server: None."""
         root = re.sub(r"/v1$", "", self.base_url)
         try:
             data = self._get_json(f"{root}/api/v0/models")
         except LLMError:
-            return []
+            return None
         return [
             m["id"]
             for m in data.get("data", [])
@@ -120,9 +120,16 @@ class ChatClient:
 
     @property
     def model(self) -> str:
-        """Konfiguriertes Modell, sonst ein bereits geladenes, sonst das erste Chat-Modell."""
+        """Konfiguriertes Modell, sonst ein geladenes, sonst (nur ohne LM Studio) das erste Chat-Modell."""
         if not self._model:
             loaded = self._loaded_lmstudio_models()
+            if loaded == []:
+                # Nicht einfach das erste Modell nehmen: LM Studio würde es ungefragt nachladen
+                # (realer Fall: 10 GB Qwen statt des gewünschten, aber nicht geladenen Gemma)
+                raise LLMError(
+                    "In LM Studio ist kein Chat-Modell geladen. "
+                    "Mit `lms load <modell>` laden oder LOCALRAG_LLM_MODEL setzen."
+                )
             candidates = loaded or [m for m in self.list_models() if "embed" not in m.lower()]
             if not candidates:
                 raise LLMError("Der Server meldet kein Chat-Modell. In LM Studio ein Modell laden.")

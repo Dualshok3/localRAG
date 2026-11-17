@@ -57,7 +57,13 @@ def hit_to_dict(hit: SearchHit) -> dict[str, Any]:
 
 
 def hit_from_dict(d: dict[str, Any]) -> SearchHit:
-    return SearchHit(**{**d, "matched_words": tuple(d.get("matched_words", ()))})
+    return SearchHit(
+        **{
+            **d,
+            "matched_words": tuple(d.get("matched_words", ())),
+            "duplicates": tuple(d.get("duplicates", ())),
+        }
+    )
 
 
 def default_embedder_for(db_path: Path) -> Embedder | None:

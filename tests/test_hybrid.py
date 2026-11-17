@@ -98,6 +98,39 @@ def test_model_switch_requires_reembed(db: Database, corpus: Path):
     assert db.get_meta("embedding_model") == "hashing-64"
 
 
+VERTRAG = (
+    "Die Kündigungsfrist für den Stellplatz beträgt einen Monat zum Monatsende. "
+    "Die Miete wird jeweils zum dritten Werktag fällig und auf das Konto der Vermieterin überwiesen."
+)
+
+
+def test_near_duplicate_files_are_collapsed(db: Database, tmp_path: Path):
+    # Realer Fall: viele automatische Backups derselben Datei verdrängten alle anderen Treffer
+    for i in range(3):
+        backup = tmp_path / "backup" / f"stellplatz_{i}.md"
+        backup.parent.mkdir(exist_ok=True)
+        backup.write_text(VERTRAG + ("" if i == 0 else f" Stand {i}."), encoding="utf-8")
+    (tmp_path / "anderes.md").write_text("Kündigungsfrist im Fitnessstudio: drei Monate.", encoding="utf-8")
+    index_paths(db, [tmp_path], embedder=HashingEmbedder())
+
+    hits = search(db, "Kündigungsfrist", mode="keyword", limit=5)
+    names = [Path(h.path).name for h in hits]
+    assert sum(n.startswith("stellplatz_") for n in names) == 1
+    assert "anderes.md" in names
+    stellplatz = next(h for h in hits if Path(h.path).name.startswith("stellplatz_"))
+    assert len(stellplatz.duplicates) == 2
+
+    plain = search(db, "Kündigungsfrist", mode="keyword", limit=5, collapse_duplicates=False)
+    assert sum(Path(h.path).name.startswith("stellplatz_") for h in plain) == 3
+
+
+def test_short_different_chunks_are_not_merged(db: Database, tmp_path: Path):
+    (tmp_path / "a.md").write_text("Kündigungsfrist drei Monate.", encoding="utf-8")
+    (tmp_path / "b.md").write_text("Kündigungsfrist vier Wochen.", encoding="utf-8")
+    index_paths(db, [tmp_path])
+    assert len(search(db, "Kündigungsfrist", mode="keyword", limit=5)) == 2
+
+
 def test_semantic_mode_without_embedder_is_an_error(db: Database, corpus: Path):
     index_paths(db, [corpus])
     with pytest.raises(ValueError):

@@ -118,6 +118,7 @@ class FileSearchTools:
                     "heading": h.heading_path,
                     "snippet": h.snippet,
                     "score": round(h.score, 4),
+                    "same_content_in": [p for p in h.duplicates if self._allowed(p)],
                 }
                 for h in visible
             ],

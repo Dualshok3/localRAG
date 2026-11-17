@@ -42,6 +42,33 @@ def test_docx_tables_are_included(tmp_path: Path):
     assert "Strom | 84 EUR" in parse(tmp_path / "t.docx")[0].text
 
 
+def test_docx_with_unknown_media_type_falls_back_to_raw_text(tmp_path: Path):
+    # Realer Fall: eingebettetes Bild mit Endung ".undefined" → python-docx bricht ab
+    import zipfile
+
+    good = make_docx(tmp_path / "gut.docx", [("h1", "Reiseplan"), ("p", "Hotel in Florenz")])
+    broken = tmp_path / "kaputt.docx"
+    rel = (
+        '<Relationship Id="rIdX" Type="http://schemas.openxmlformats.org/officeDocument/2006/'
+        'relationships/image" Target="media/bild.undefined"/></Relationships>'
+    )
+    with zipfile.ZipFile(good) as src, zipfile.ZipFile(broken, "w") as dst:
+        for item in src.infolist():
+            data = src.read(item.filename)
+            if item.filename == "word/_rels/document.xml.rels":
+                data = data.decode("utf-8").replace("</Relationships>", rel).encode("utf-8")
+            dst.writestr(item, data)
+        dst.writestr("word/media/bild.undefined", b"\x89PNG")
+
+    text = "\n".join(s.text for s in parse(broken))
+    assert "Reiseplan" in text and "Hotel in Florenz" in text
+
+    from localrag.ingest.parsers.office import _parse_docx_raw
+
+    raw = "\n".join(s.text for s in _parse_docx_raw(broken))
+    assert "Reiseplan" in raw and "Hotel in Florenz" in raw
+
+
 def test_markdown_headings_and_code_blocks(tmp_path: Path):
     md = tmp_path / "n.md"
     md.write_text("# Titel\nText\n```\n# kein heading\n```\n## Unter\nMehr\n", encoding="utf-8")

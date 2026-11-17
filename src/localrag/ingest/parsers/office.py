@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import re
+import zipfile
 from pathlib import Path
+from xml.etree import ElementTree
 
 import docx
 from docx.table import Table
@@ -32,11 +34,41 @@ def _table_text(table: Table) -> str:
     return "\n".join(rows)
 
 
+_W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+
+
+def _parse_docx_raw(path: Path) -> list[Section]:
+    """Notlösung: Text direkt aus word/document.xml lesen.
+
+    python-docx bricht ab, wenn z. B. ein eingebettetes Bild einen unbekannten Content-Type hat
+    (realer Fall: Bild mit Endung ".undefined"). Der Text ist davon nicht betroffen.
+    """
+    try:
+        with zipfile.ZipFile(path) as zf:
+            root = ElementTree.fromstring(zf.read("word/document.xml"))
+    except (zipfile.BadZipFile, KeyError, ElementTree.ParseError, OSError) as exc:
+        raise ParseError(f"DOCX nicht lesbar: {exc}") from exc
+    paragraphs = []
+    for par in root.iter(f"{_W}p"):
+        text = "".join(
+            (node.text or "") if node.tag == f"{_W}t" else " "
+            for node in par.iter()
+            if node.tag in (f"{_W}t", f"{_W}tab")
+        )
+        if text.strip():
+            paragraphs.append(text)
+    text = "\n\n".join(paragraphs)
+    return [Section(text=text)] if text else []
+
+
 def parse_docx(path: Path) -> list[Section]:
     try:
         document = docx.Document(str(path))
     except Exception as exc:
-        raise ParseError(f"DOCX nicht lesbar: {exc}") from exc
+        try:
+            return _parse_docx_raw(path)
+        except ParseError:
+            raise ParseError(f"DOCX nicht lesbar: {exc}") from exc
 
     sections: list[Section] = []
     headings = HeadingStack()

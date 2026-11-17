@@ -135,7 +135,7 @@ Was es **besonders** macht (statt nur LangChain-Tutorial nachgebaut):
 | Sprache / Env | **Python 3.12** mit **uv** | Poetry, pip | 3.14 ist installiert, aber PyTorch & Co. hinken neuen Python-Versionen oft hinterher. uv verwaltet die Version sauber. |
 | PyTorch | **≥ 2.7 mit CUDA 12.8+** | – | Die RTX 50er-Serie (Blackwell) braucht neue CUDA-Builds. |
 | Parsing | **PyMuPDF**, **python-docx**, **openpyxl**, **MarkItDown** | Docling, Unstructured | Schnell, leichtgewichtig. Docling für komplexe Layouts/Tabellen später als Upgrade. |
-| OCR | **Tesseract** (deu+eng) oder **RapidOCR** | EasyOCR, Docling-OCR | Nur für Scans/Bilder, opt-in pro Ordner. |
+| OCR | **Windows.Media.Ocr** (eingebaut, de-DE + en-US) | Tesseract, RapidOCR, EasyOCR | Umgesetzt: keine Zusatzsoftware, kein Modell-Download. Nur für PDF-Seiten ohne Text, gedrehte Scans werden erkannt. Tesseract/RapidOCR später für Linux. |
 | Chunking | Eigene Implementierung: strukturbewusst (Überschriften, Absätze), 500 Tokens, 15 % Überlappung | LangChain-Splitter | Selbst bauen = mehr lernen und im README erklärbar. |
 | Embeddings | **BAAI/bge-m3** (mehrsprachig, 1024 Dim) | multilingual-e5-large, Qwen3-Embedding | Sehr gut für Deutsch + Englisch, läuft lokal auf der GPU. |
 | Datenhaltung | **Eine SQLite-Datei** für Manifest, Chunks, Volltext und Vektoren | – | Ein System, eine Datei, Transaktionen: Datei geändert → Text und Vektoren atomar aktualisiert. Siehe [ADR 0001](docs/adr/0001-sqlite-statt-vektordatenbank.md). |
@@ -283,18 +283,19 @@ RAG/
   3. Chunkgrößen 256 / 512 / 1024
   4. mit vs. ohne `heading_path`-Kontext
   5. Embedding-Modelle im Vergleich
-- [ ] **Benchmark gegen Windows-Suche** auf denselben Fragen (Wie oft ist die richtige Datei in den Top 5?)
-  *(erster Lauf auf echten Dateien, 22 Fragen: Hybrid Recall@5 0,95 gegenüber Windows-Suche 0,27. Die Windows-Suche kennt D: nicht und scheitert an ganzen Sätzen. Neue Prioritäten aus dem Test: OCR für Scans, Duplikate zusammenfassen, Fragen ohne gemeinsame Wörter ins Set aufnehmen)*
+- [x] **Benchmark gegen Windows-Suche** auf denselben Fragen (Wie oft ist die richtige Datei in den Top 5?)
+  *(echte Dateien, 24 Fragen: Hybrid Recall@5 0,96 gegenüber Windows-Suche 0,25. Die Windows-Suche kennt D: nicht und scheitert an ganzen Sätzen. Aus dem Test umgesetzt: OCR für Scans, Duplikate zusammenfassen, DOCX-Notfallparser. Offen: Fragen ohne gemeinsame Wörter ins Set aufnehmen, Kürzel-Dokumente)*
 
 **Ergebnis:** Eine Tabelle wie „Hybrid + Rerank: Recall@5 = 0,91 vs. Windows-Suche 0,34“ – genau so etwas
 überzeugt beim Lesen eines GitHub-Profils.
 
 ### Phase 4 – Alltagstauglich (1–2 Wochen)
-- [ ] Inkrementelle Indexierung (Manifest mit Hash/mtime), gelöschte Dateien entfernen
+- [x] Inkrementelle Indexierung (Manifest mit Hash/mtime), gelöschte Dateien entfernen
 - [ ] watchdog-Watcher als Hintergrunddienst
 - [ ] Weitere Formate: XLSX, PPTX, HTML, E-Mails (.eml/.msg), Quellcode
-- [ ] OCR für ausgewählte Ordner
-- [ ] Exclude-Regeln, Secret-Filter, Fehler-Log für kaputte Dateien
+- [x] OCR für gescannte PDFs *(Windows-OCR, Drehungserkennung, früher leere PDFs werden einmal nachgeholt)*
+- [x] Nahezu gleiche Treffer (Backups, PDF + DOCX) zusammenfassen
+- [ ] Exclude-Regeln, Secret-Filter, Fehler-Log für kaputte Dateien *(Fehler-Log: `localrag status --errors`; Neuversuch nach Parser-Update)*
 - [ ] Filter in der Suche: `type:pdf`, `in:Rechnungen`, `after:2024-01`
 
 ### Phase 5 – Oberflächen & Integration (1–2 Wochen)

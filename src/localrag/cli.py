@@ -26,6 +26,7 @@ from localrag.index.db import Database
 from localrag.index.embedder import Embedder, SemanticUnavailableError, load_embedder, semantic_available
 from localrag.index.vector_store import EmbeddingModelMismatchError, VectorStore
 from localrag.ingest.indexer import IndexStats, index_paths
+from localrag.ingest.ocr import OcrUnavailableError, load_ocr
 from localrag.ingest.scanner import FileInfo
 from localrag.retrieval.hybrid import search as run_search
 
@@ -116,6 +117,9 @@ def index(
         bool, typer.Option(help="Alle Vektoren neu berechnen (z. B. nach Modellwechsel).")
     ] = False,
     model: Annotated[str | None, typer.Option(help="Embedding-Modell, Standard: BAAI/bge-m3.")] = None,
+    ocr: Annotated[
+        str, typer.Option(help="Texterkennung für gescannte PDFs: auto, windows oder none.")
+    ] = "auto",
 ) -> None:
     """Indexiert Ordner inkrementell (nur neue und geänderte Dateien) und erzeugt Vektoren."""
     missing = [p for p in paths if not p.exists()]
@@ -124,6 +128,11 @@ def index(
         raise typer.Exit(1)
 
     excluded = set(DEFAULT_EXCLUDED_DIRS) | set(exclude or [])
+    try:
+        ocr_engine = load_ocr(ocr)
+    except (OcrUnavailableError, ValueError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
     embedder = _load_embedder_for_index(embed, model)
     started = time.perf_counter()
     with (
@@ -161,6 +170,7 @@ def index(
                 embedder=embedder,
                 reembed=reembed,
                 embed_progress=on_embed,
+                ocr=ocr_engine,
             )
         except EmbeddingModelMismatchError as exc:
             console.print(f"[red]{exc}[/red]")
@@ -174,7 +184,12 @@ def index(
     )
     _print_embed_info(stats, embedder)
     if stats.empty:
-        console.print(f"[yellow]{stats.empty} Dateien ohne Text[/yellow] (z. B. gescannte PDFs → OCR folgt)")
+        hint = (
+            f"auch nicht per OCR ({ocr_engine.name})"
+            if ocr_engine
+            else "z. B. gescannte PDFs → OCR mit `uv sync --extra ocr`"
+        )
+        console.print(f"[yellow]{stats.empty} Dateien ohne Text[/yellow] ({hint})")
     if stats.failed:
         console.print(f"[red]{stats.failed} Fehler[/red] – Details mit `localrag status --errors`")
     console.print(f"[dim]Index: {db}[/dim]")
@@ -245,6 +260,7 @@ def search(
                 "heading": h.heading_path,
                 "score": h.score,
                 "snippet": h.snippet,
+                "duplicates": list(h.duplicates),
             }
             for h in hits
         ]
@@ -264,6 +280,10 @@ def search(
         snippet = Text("    " + h.snippet)
         snippet.highlight_words(h.matched_words, style="bold yellow", case_sensitive=False)
         console.print(snippet)
+        if h.duplicates:
+            names = ", ".join(Path(p).name for p in h.duplicates[:2])
+            more = f" und {len(h.duplicates) - 2} weitere" if len(h.duplicates) > 2 else ""
+            console.print(f"    [dim]+ gleicher Inhalt in {names}{more}[/dim]")
     console.print(f"[dim]{len(hits)} Treffer in {elapsed_ms:.0f} ms ({resolved})[/dim]")
 
 

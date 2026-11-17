@@ -24,6 +24,16 @@ semantic = [
     "torch>=2.7",
     "sentence-transformers>=3.0",
 ]
+# Texterkennung für gescannte PDFs über die eingebaute Windows-OCR (kein Modell-Download)
+ocr = [
+    "winrt-runtime>=2.0; sys_platform == 'win32'",
+    "winrt-Windows.Foundation>=2.0; sys_platform == 'win32'",
+    "winrt-Windows.Foundation.Collections>=2.0; sys_platform == 'win32'",
+    "winrt-Windows.Globalization>=2.0; sys_platform == 'win32'",
+    "winrt-Windows.Graphics.Imaging>=2.0; sys_platform == 'win32'",
+    "winrt-Windows.Media.Ocr>=2.0; sys_platform == 'win32'",
+    "winrt-Windows.Storage.Streams>=2.0; sys_platform == 'win32'",
+]
 # MCP-Server für Claude Desktop / Claude Code
 mcp = [
     "mcp>=1.2",

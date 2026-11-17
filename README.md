@@ -37,7 +37,8 @@ Quellen
 - 📊 **Gemessen statt behauptet:** Ein Eval-Set vergleicht Stichwort-, Vektor- und Hybridsuche, die
   Ergebnisse stehen [weiter unten](#messung-stichwort-vs-vektor-vs-hybrid).
 
-Formate: PDF, DOCX, Markdown, TXT. Weitere Formate, Reranker und OCR sind geplant, siehe [PLAN.md](PLAN.md).
+Formate: PDF (gescannte PDFs per OCR, unter Windows ohne Zusatzsoftware), DOCX, Markdown, TXT. Weitere
+Formate und ein Reranker sind geplant, siehe [PLAN.md](PLAN.md).
 
 ## Quickstart
 
@@ -45,7 +46,7 @@ Voraussetzung: [uv](https://docs.astral.sh/uv/).
 
 ```bash
 git clone https://github.com/Dualshok3/RAG.git && cd RAG
-uv sync --extra semantic                      # inkl. PyTorch/CUDA; ohne Extra: nur Stichwortsuche
+uv sync --extra semantic --extra ocr          # PyTorch/CUDA + Windows-OCR; ohne Extras: nur Stichwortsuche
 uv run localrag index "D:\Dokumente"          # inkrementell, beim zweiten Lauf nur Änderungen
 uv run localrag search "Darf ich eine Katze halten?"
 uv run localrag search "PF-1234" --mode keyword   # schnell, ohne Modell
@@ -179,26 +180,32 @@ nur die Zahlen. Hardware: RTX 5060 Ti 16 GB.
 | `localrag search` ohne Dienst (Modell wird geladen) | ~19 s | |
 | `localrag ask` mit Gemma 4 26B über den Dienst | 6–8 s | |
 
-**Trefferquote** bei 22 beantwortbaren Fragen mit bekannter richtiger Datei:
+**Trefferquote** bei 24 Fragen mit bekannter richtiger Datei, darunter zwei zu gescannten PDFs:
 
 | | BM25 | Vektor | Hybrid | Windows-Suche |
 |---|---|---|---|---|
-| Recall@1 | 0.82 | 0.73 | **0.82** | 0.27 |
-| Recall@5 | 0.91 | 0.91 | **0.95** | 0.27 |
+| Recall@1 | 0.79 | 0.75 | **0.79** | 0.25 |
+| Recall@5 | 0.83 | 0.92 | **0.96** | 0.25 |
 
 Die Windows-Suche indexiert standardmäßig nur die Benutzerordner auf C:, der Studienordner auf D: fehlt
 ihr komplett. Nur auf die Fragen zu Dateien gerechnet, die sie kennt, findet sie 6 von 13. Ganze Sätze
 liefern dort fast immer null Treffer, nur Stichworte und Kennungen funktionieren.
 
-Was der echte Test zusätzlich gezeigt hat:
-- **Scans:** 8 PDFs haben keine Textebene, etwa ein eingescanntes Zeugnis. Ohne OCR sind sie
-  unauffindbar, deshalb hat OCR jetzt hohe Priorität.
-- **Duplikate:** Viele fast identische Versionen derselben Datei, etwa automatische Backups, belegen
-  alle Top-Plätze. Hier braucht es eine Zusammenfassung nahezu gleicher Treffer.
-- **Kürzel-Dokumente:** Rechnungen aus Großbuchstaben-Kürzeln findet keine Methode über eine
-  umschriebene Frage.
-- **Leere Antworten:** Gemma lieferte bei einer unbeantwortbaren Frage eine leere Antwort. Das ist
-  behoben, jetzt kommt der feste Satz „nichts gefunden“.
+Der erste Durchlauf hat Schwächen aufgedeckt, die inzwischen behoben sind:
+
+| Befund | Lösung | Wirkung |
+|---|---|---|
+| 8 gescannte PDFs ohne Textebene, z. B. ein Zeugnis | OCR über die eingebaute Windows-Texterkennung, gedrehte Scans werden automatisch erkannt | alle 8 lesbar, „Welche Note steht in meinem Zeugnis?“ wird richtig beantwortet |
+| Viele fast gleiche Backups derselben Datei belegen alle Top-Plätze | Nahezu gleiche Abschnitte (≥ 85 % gleiche Wörter) zu einem Treffer zusammenfassen, Hinweis „+ gleicher Inhalt in …“ | Platz frei für andere Dateien |
+| DOCX mit beschädigtem eingebettetem Bild nicht lesbar | Text notfalls direkt aus `word/document.xml` lesen | Datei lesbar |
+| Leere Antwort des LLM bei unbeantwortbarer Frage | Fester Satz „Dazu habe ich in deinen Dateien nichts gefunden.“ | |
+| Kein Modell geladen → LM Studio lud ungefragt ein anderes (10 GB) | Klare Fehlermeldung statt stillem Wechsel | |
+
+Recall@5 von Hybrid stieg dadurch von 0.88 auf 0.96, gerechnet über dieselben 24 Fragen.
+
+Noch offen:
+- **Kürzel-Dokumente:** Rechnungen aus Großbuchstaben-Kürzeln findet keine
+  Methode über eine umschriebene Frage. Ein Reranker könnte helfen.
 - **Einschränkung:** Die Fragen entstanden nach dem Lesen der Dokumente und teilen deshalb oft Wörter mit
   ihnen. Das begünstigt BM25. Im synthetischen Korpus mit härteren Umschreibungen ist die Vektorsuche
   klar überlegen.
@@ -225,8 +232,8 @@ flowchart LR
 
 ## Geplant
 
-Reranker (bge-reranker-v2-m3) · Benchmark gegen die Windows-Suche · Excel, PowerPoint, E-Mails ·
-OCR für Scans · Dateiüberwachung · Web-Oberfläche. Reihenfolge und Begründung stehen in [PLAN.md](PLAN.md).
+Reranker (bge-reranker-v2-m3) · Excel, PowerPoint, E-Mails · OCR für Bilddateien und andere
+Betriebssysteme · Dateiüberwachung · Web-Oberfläche. Reihenfolge und Begründung stehen in [PLAN.md](PLAN.md).
 
 ## Keine privaten Daten im Repo
 

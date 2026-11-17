@@ -7,6 +7,7 @@ zwischen -1 und 1). RRF nutzt deshalb nur die Ränge und braucht keine Normalisi
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from typing import Literal
 
@@ -46,6 +47,7 @@ def search(
     filetypes: list[str] | None = None,
     one_per_document: bool = True,
     candidates: int = 50,
+    collapse_duplicates: bool = True,
 ) -> list[SearchHit]:
     resolved = resolve_mode(db, mode, embedder)
     if resolved in ("semantic", "hybrid") and embedder is None:
@@ -78,16 +80,31 @@ def search(
         fused = rrf([[i for i, _ in keyword_ranked], [i for i, _ in vector_ranked]])
 
     rows = _fetch_chunks(db, [i for i, _ in fused])
-    results: list[SearchHit] = []
+    kept: list[tuple[int, float, dict, frozenset[str], list[str]]] = []
     seen_docs: set[int] = set()
     for chunk_id, score in fused:
         row = rows.get(chunk_id)
         if row is None or (types and row["filetype"] not in types):
             continue
-        if one_per_document:
-            if row["document_id"] in seen_docs:
+        if one_per_document and row["document_id"] in seen_docs:
+            continue
+        words = _word_set(row["text"])
+        if collapse_duplicates:
+            original = next((k for k in kept if _near_duplicate(words, k[3])), None)
+            if original is not None:
+                # Gleicher Inhalt in anderer Datei (Backup, Kopie, PDF-Export) → beim Original vermerken
+                dups = original[4]
+                if row["path"] != original[2]["path"] and row["path"] not in dups:
+                    dups.append(row["path"])
+                seen_docs.add(row["document_id"])
                 continue
-            seen_docs.add(row["document_id"])
+        seen_docs.add(row["document_id"])
+        kept.append((chunk_id, score, row, words, []))
+        if len(kept) >= limit:
+            break
+
+    results: list[SearchHit] = []
+    for chunk_id, score, row, _, dups in kept:
         snippet, matched = make_snippet(row["text"], terms)
         results.append(
             SearchHit(
@@ -101,11 +118,28 @@ def search(
                 score=score,
                 snippet=snippet,
                 matched_words=matched,
+                duplicates=tuple(dups),
             )
         )
-        if len(results) >= limit:
-            break
     return results
+
+
+_WORD = re.compile(r"[^\W_]+")
+NEAR_DUPLICATE_JACCARD = 0.85
+MIN_WORDS_FOR_FUZZY = 8
+
+
+def _word_set(text: str) -> frozenset[str]:
+    return frozenset(w.casefold() for w in _WORD.findall(text))
+
+
+def _near_duplicate(a: frozenset[str], b: frozenset[str]) -> bool:
+    """Gleich oder fast gleich (Jaccard über Wortmengen). Kurze Abschnitte nur bei exakt gleichen Wörtern."""
+    if a == b:
+        return bool(a)
+    if min(len(a), len(b)) < MIN_WORDS_FOR_FUZZY:
+        return False
+    return len(a & b) / len(a | b) >= NEAR_DUPLICATE_JACCARD
 
 
 def _fetch_chunks(db: Database, ids: list[int]) -> dict[int, dict]:

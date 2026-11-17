@@ -21,16 +21,17 @@ def sse(*pieces: str) -> bytes:
 class FakeServer:
     """Simuliert LM Studio: /v1/models, /api/v0/models, /v1/chat/completions (Streaming)."""
 
-    def __init__(self, pieces: list[str], loaded: list[str] | None = None) -> None:
+    def __init__(self, pieces: list[str], loaded: list[str] | None = None, lmstudio: bool = True) -> None:
         self.pieces = pieces
         self.loaded = loaded or []
+        self.lmstudio = lmstudio  # False = anderer OpenAI-kompatibler Server ohne /api/v0
         self.requests: list[dict] = []
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         if request.url.path == "/v1/models":
             ids = ["text-embedding-nomic", "gemma-x", "qwen-y"]
             return httpx.Response(200, json={"data": [{"id": i} for i in ids]})
-        if request.url.path == "/api/v0/models":
+        if request.url.path == "/api/v0/models" and self.lmstudio:
             return httpx.Response(
                 200, json={"data": [{"id": m, "state": "loaded", "type": "llm"} for m in self.loaded]}
             )
@@ -80,9 +81,15 @@ def test_model_prefers_loaded_lmstudio_model():
         assert client.model == "qwen-y"
 
 
-def test_model_falls_back_to_first_chat_model():
-    with client_for(FakeServer([])) as client:
+def test_model_falls_back_to_first_chat_model_on_other_servers():
+    with client_for(FakeServer([], lmstudio=False)) as client:
         assert client.model == "gemma-x"  # Embedding-Modelle werden übersprungen
+
+
+def test_lmstudio_without_loaded_model_is_an_error_not_a_silent_jit_load():
+    # Realer Fall: Gemma war nicht geladen → LM Studio lud ungefragt das erste Modell der Liste
+    with client_for(FakeServer([])) as client, pytest.raises(LLMError, match="lms load"):
+        _ = client.model
 
 
 def test_unreachable_server_gives_helpful_error():

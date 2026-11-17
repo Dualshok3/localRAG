@@ -16,6 +16,8 @@ from rich.table import Table
 from rich.text import Text
 
 from localrag import __version__
+from localrag.api.client import ServiceClient
+from localrag.api.server import DEFAULT_HOST, DEFAULT_PORT
 from localrag.config import DEFAULT_EXCLUDED_DIRS, DEFAULT_MAX_FILE_MB, ENV_DB, default_db_path
 from localrag.generation.answer import AnswerResult, retrieve_sources, stream_answer
 from localrag.generation.llm import ENV_LLM_MODEL, ENV_LLM_URL, ChatClient, LLMError
@@ -39,6 +41,36 @@ DbOption = Annotated[
     Path,
     typer.Option("--db", envvar=ENV_DB, help="Pfad zur Index-Datenbank.", default_factory=default_db_path),
 ]
+LocalOption = Annotated[
+    bool, typer.Option("--local", help="Laufenden Dienst (`localrag serve`) ignorieren und direkt suchen.")
+]
+
+
+@app.command()
+def serve(
+    db: DbOption,
+    host: Annotated[str, typer.Option(help="Adresse. Nur 127.0.0.1 ist privat!")] = DEFAULT_HOST,
+    port: Annotated[int, typer.Option(help="Port.")] = DEFAULT_PORT,
+    no_model: Annotated[bool, typer.Option("--no-model", help="Ohne Embedding-Modell (nur BM25).")] = False,
+) -> None:
+    """Startet den lokalen Dienst: Modell bleibt geladen, `search`/`ask` antworten dann sofort."""
+    import uvicorn
+
+    from localrag.api.server import create_app
+
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        console.print(
+            f"[bold red]Achtung:[/bold red] Mit --host {host} sind Inhalte deiner Dateien im Netzwerk lesbar."
+        )
+    if not db.exists():
+        console.print(f"[red]Kein Index unter {db}[/red] – zuerst `localrag index <ordner>` ausführen.")
+        raise typer.Exit(1)
+    with console.status("Lade Embedding-Modell…"):
+        application = create_app(db, load_model=not no_model)
+    model = application.state.embedder.name if application.state.embedder else "keins (nur BM25)"
+    console.print(f"[green]LocalRAG-Dienst[/green] auf http://{host}:{port} · Modell: {model} · Index: {db}")
+    console.print("[dim]Beenden mit Strg+C[/dim]")
+    uvicorn.run(application, host=host, port=port, log_level="warning")
 
 
 @app.command()
@@ -137,6 +169,7 @@ def search(
             "--mode", "-m", help="auto | keyword | semantic | hybrid (auto = hybrid, falls möglich)"
         ),
     ] = "auto",
+    local: LocalOption = False,
 ) -> None:
     """Durchsucht den Index: Stichworte (BM25), Bedeutung (Vektoren) oder beides (hybrid)."""
     if not db.exists():
@@ -146,24 +179,36 @@ def search(
         console.print(f"[red]Unbekannter Modus {mode!r}[/red]")
         raise typer.Exit(2)
 
-    with Database(db) as database:
-        embedder = _load_embedder_for_search(database, mode)
-        resolved = "keyword" if embedder is None else ("hybrid" if mode == "auto" else mode)
-        started = time.perf_counter()
+    service = None if local else _service_for(db)
+    if service is not None:
         try:
-            hits = run_search(
-                database,
-                query,
-                mode=resolved,  # type: ignore[arg-type]
-                embedder=embedder,
-                limit=limit,
-                filetypes=filetype,
-                one_per_document=not all_chunks,
-            )
-        except EmbeddingModelMismatchError as exc:
+            with service:
+                resolved, elapsed_ms, hits = service.search(
+                    query, mode=mode, limit=limit, filetypes=filetype, chunks=all_chunks
+                )
+        except RuntimeError as exc:
             console.print(f"[red]{exc}[/red]")
             raise typer.Exit(1) from exc
-        elapsed_ms = (time.perf_counter() - started) * 1000
+        resolved += ", Dienst"
+    else:
+        with Database(db) as database:
+            embedder = _load_embedder_for_search(database, mode)
+            resolved = "keyword" if embedder is None else ("hybrid" if mode == "auto" else mode)
+            started = time.perf_counter()
+            try:
+                hits = run_search(
+                    database,
+                    query,
+                    mode=resolved,  # type: ignore[arg-type]
+                    embedder=embedder,
+                    limit=limit,
+                    filetypes=filetype,
+                    one_per_document=not all_chunks,
+                )
+            except EmbeddingModelMismatchError as exc:
+                console.print(f"[red]{exc}[/red]")
+                raise typer.Exit(1) from exc
+            elapsed_ms = (time.perf_counter() - started) * 1000
 
     if as_json:
         payload = [
@@ -213,6 +258,7 @@ def ask(
     show_context: Annotated[
         bool, typer.Option("--show-context", help="Alle übergebenen Textstellen zeigen.")
     ] = False,
+    local: LocalOption = False,
 ) -> None:
     """Beantwortet eine Frage aus deinen Dateien – mit Quellenangaben (lokales LLM, z. B. LM Studio)."""
     if not db.exists():
@@ -221,6 +267,22 @@ def ask(
     if mode not in ("auto", "keyword", "semantic", "hybrid"):
         console.print(f"[red]Unbekannter Modus {mode!r}[/red]")
         raise typer.Exit(2)
+
+    # Der Dienst nutzt seine eigene LLM-Konfiguration → bei explizitem --llm-url lokal arbeiten
+    service = None if (local or llm_url) else _service_for(db)
+    if service is not None:
+        with service:
+            result, resolved, search_ms, answer_s, model_name = _ask_via_service(
+                service,
+                question,
+                k=k,
+                mode=mode,
+                filetypes=filetype,
+                llm_model=llm_model,
+                show_context=show_context,
+            )
+        _print_answer_footer(result, f"{resolved}, Dienst", search_ms, answer_s, model_name)
+        return
 
     with Database(db) as database, ChatClient(llm_url, llm_model) as client:
         try:
@@ -260,8 +322,57 @@ def ask(
             console.print(f"\n[red]{exc}[/red]")
             raise typer.Exit(1) from exc
         answer_s = time.perf_counter() - started
-    console.print()
+    _print_answer_footer(result, resolved, search_ms, answer_s, model_name)
 
+
+def _ask_via_service(
+    service: ServiceClient,
+    question: str,
+    *,
+    k: int,
+    mode: str,
+    filetypes: list[str] | None,
+    llm_model: str | None,
+    show_context: bool,
+) -> tuple[AnswerResult, str, float, float, str]:
+    result = AnswerResult(question=question, sources=[])
+    resolved, search_ms, model_name = mode, 0.0, "?"
+    started = time.perf_counter()
+    parts: list[str] = []
+    try:
+        with console.status("Suche und frage das Modell…") as status:
+            for event in service.ask(question, k=k, mode=mode, filetypes=filetypes, llm_model=llm_model):
+                kind = event["type"]
+                if kind == "sources":
+                    result.sources = event["sources"]
+                    resolved, search_ms = event["mode"], event["search_ms"]
+                    if show_context:
+                        for i, h in enumerate(result.sources, start=1):
+                            console.print(f"[dim][{i}] {source_label(h)}[/dim]")
+                elif kind == "model":
+                    model_name = event["model"] or "–"
+                elif kind == "token":
+                    status.stop()
+                    parts.append(event["text"])
+                    console.print(event["text"], end="", markup=False, highlight=False, soft_wrap=True)
+                elif kind == "done":
+                    result.cited = event["cited"]
+                elif kind == "error":
+                    status.stop()
+                    console.print(f"\n[red]{event['message']}[/red]")
+                    raise typer.Exit(1)
+    except RuntimeError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    result.text = "".join(parts).strip()
+    return result, resolved, search_ms, time.perf_counter() - started, model_name
+
+
+def _print_answer_footer(
+    result: AnswerResult, resolved: str, search_ms: float, answer_s: float, model_name: str
+) -> None:
+    sources = result.sources
+    console.print()
     if result.cited_sources:
         console.print("\n[bold]Quellen[/bold]")
         for n, h in result.cited_sources:
@@ -277,6 +388,15 @@ def ask(
         f"[dim]Suche {search_ms:.0f} ms ({resolved}, {len(sources)} Textstellen) · "
         f"Antwort {answer_s:.1f} s ({model_name})[/dim]"
     )
+
+
+def _service_for(db: Path) -> ServiceClient | None:
+    """Laufenden Dienst für genau diesen Index finden, sonst None (dann wird lokal gesucht)."""
+    client = ServiceClient()
+    if client.serves(db):
+        return client
+    client.close()
+    return None
 
 
 def _load_embedder_for_index(embed: bool | None, model: str | None) -> Embedder | None:

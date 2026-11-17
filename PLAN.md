@@ -261,7 +261,7 @@ RAG/
 - [x] bge-m3-Embeddings → `chunks_vec` (sqlite-vec), fp16 auf der GPU, Modellwechsel wird erkannt (`--reembed`)
 - [x] Hybrid-Suche mit RRF, Modi `keyword` / `semantic` / `hybrid`
 - [x] Dieselben Fragen erneut → Vorher/Nachher-Vergleich in [eval/results/latest.md](eval/results/latest.md)
-- [ ] Bekannte Schwäche: CLI lädt das Modell bei jeder Suche neu (einige Sekunden) → löst der API-Server in Phase 5
+- [x] Bekannte Schwäche: CLI lädt das Modell bei jeder Suche neu (~20 s) → gelöst mit `localrag serve` (siehe Phase 5)
 
 **Ergebnis:** Funktionierende Hybrid-Suche in einer SQLite-Datei. Erstes Demo-GIF fürs README.
 
@@ -296,7 +296,7 @@ RAG/
 - [ ] Filter in der Suche: `type:pdf`, `in:Rechnungen`, `after:2024-01`
 
 ### Phase 5 – Oberflächen & Integration (1–2 Wochen)
-- [ ] FastAPI-Backend mit Streaming (SSE)
+- [x] FastAPI-Dienst `localrag serve` mit `/search`, `/ask` (NDJSON-Streaming), `/health`; CLI nutzt ihn automatisch
 - [ ] Web-UI: Suchfeld, Antwort, Quellen-Karten, Klick öffnet Datei an der Stelle
 - [ ] **MCP-Server** → in Claude Desktop/Code einbinden („Durchsuche meine Dateien nach …“)
 - [ ] Optional: Tray-App mit globalem Hotkey

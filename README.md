@@ -40,9 +40,17 @@ uv run localrag ask "Wie hoch ist der neue Stromabschlag?"
 Das Modell bekommt nur die gefundenen Textstellen und soll jede Aussage mit `[n]` belegen. Steht die
 Antwort nicht in den Quellen, sagt es „Dazu habe ich in deinen Dateien nichts gefunden.“
 
-Beim ersten Start wird bge-m3 heruntergeladen. Die CLI lädt das Modell bei jeder Suche neu, das dauert
-einige Sekunden. Die Suche selbst braucht danach ~30 ms (RTX 5060 Ti). Ein dauerhaft laufender Dienst
-folgt in Phase 5.
+Beim ersten Start wird bge-m3 heruntergeladen. Ohne Dienst lädt die CLI das Modell bei jeder Suche neu,
+das dauert rund 20 s. Schneller geht es mit dem Hintergrunddienst:
+
+```bash
+uv run localrag serve            # hält das Modell geladen, nur unter 127.0.0.1 erreichbar
+uv run localrag search "…"       # nutzt den Dienst automatisch → Antwort in Millisekunden
+uv run localrag search "…" --local   # Dienst ignorieren
+```
+
+Der Dienst bietet auch eine HTTP-API (`/search`, `/ask`, `/health`, Doku unter `http://127.0.0.1:8765/docs`).
+Weil er Inhalte deiner Dateien herausgibt, bindet er standardmäßig nur an 127.0.0.1.
 
 ## Messung: Stichwort vs. Vektor vs. Hybrid
 

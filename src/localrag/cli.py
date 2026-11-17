@@ -73,6 +73,33 @@ def serve(
     uvicorn.run(application, host=host, port=port, log_level="warning")
 
 
+@app.command("mcp")
+def mcp_command(
+    db: DbOption,
+    allow: Annotated[
+        list[Path] | None,
+        typer.Option("--allow", help="Nur Treffer aus diesen Ordnern herausgeben (mehrfach möglich)."),
+    ] = None,
+    no_model: Annotated[bool, typer.Option("--no-model", help="Ohne Embedding-Modell (nur BM25).")] = False,
+) -> None:
+    """MCP-Server (stdio) für Claude Desktop / Claude Code: Suche in deinen Dateien als Werkzeug."""
+    from localrag.api.server import default_embedder_for
+    from localrag.mcp_server import FileSearchTools, build_server
+
+    # stdout gehört dem MCP-Protokoll → keine Konsolenausgaben hier
+    tools = FileSearchTools(
+        db,
+        allowed_roots=allow or [],
+        embedder_loader=None if no_model else (lambda: default_embedder_for(db)),
+    )
+    try:
+        server = build_server(tools)
+    except RuntimeError as exc:
+        Console(stderr=True).print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    server.run()
+
+
 @app.command()
 def index(
     paths: Annotated[list[Path], typer.Argument(help="Ordner oder Dateien, die indexiert werden.")],

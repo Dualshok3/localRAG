@@ -146,7 +146,7 @@ Was es **besonders** macht (statt nur LangChain-Tutorial nachgebaut):
 | Datei-Watcher | **watchdog** | Windows USN-Journal | Später USN-Journal für Profi-Bonus (so arbeitet auch Everything). |
 | API | **FastAPI** | Flask | Async, Streaming, automatische Doku. |
 | UI | Phase 1: **Typer**-CLI · Phase 2: Web-UI (FastAPI + HTMX oder React) · Phase 3: Tray-App mit Hotkey | Streamlit, Gradio | CLI zuerst = schnell testbar. |
-| KI-Integration | **MCP-Server** (`search_files`, `ask_files`) | – | Claude Desktop / Claude Code können dann die eigenen Dateien durchsuchen. Starkes Portfolio-Feature. |
+| KI-Integration | **MCP-Server** (`search_files`, `read_passage`, `index_status`, Ordner-Freigabe per `--allow`) | – | Claude Desktop / Claude Code können dann die eigenen Dateien durchsuchen. Starkes Portfolio-Feature. |
 | Qualität | **pytest**, **ruff**, **mypy**, GitHub Actions | – | Zeigt professionelle Arbeitsweise. |
 
 > Bewusst **ohne** LangChain/LlamaIndex im Kern: Die Frameworks verstecken genau das, was man lernen und zeigen will.
@@ -275,6 +275,7 @@ RAG/
 
 ### Phase 3 – Qualität messen & verbessern (1 Woche) ⭐ *das Portfolio-Herzstück*
 - [ ] **Eval-Set**: 50–100 Fragen mit bekannter Quelldatei (teils per LLM generiert, manuell geprüft)
+  *(Zwischenstand: 16 Dokumente, 35 Fragen inkl. Fallen mit ähnlichen Dokumenten. Recall@1: BM25 0,60 · Vektor 0,89 · Hybrid 0,83. Gleich gewichtetes RRF kostet bei Umschreibungen Platz 1, daher als Nächstes Reranker bzw. gewichtetes RRF testen)*
 - [ ] Metriken: **Recall@5, Recall@10, MRR**, Latenz p50/p95; für Antworten: Faithfulness (LLM-as-Judge)
 - [ ] Experimente, jeweils mit Zahlen im README:
   1. nur Vektor vs. nur BM25 vs. **Hybrid (RRF)**
@@ -298,7 +299,7 @@ RAG/
 ### Phase 5 – Oberflächen & Integration (1–2 Wochen)
 - [x] FastAPI-Dienst `localrag serve` mit `/search`, `/ask` (NDJSON-Streaming), `/health`; CLI nutzt ihn automatisch
 - [ ] Web-UI: Suchfeld, Antwort, Quellen-Karten, Klick öffnet Datei an der Stelle
-- [ ] **MCP-Server** → in Claude Desktop/Code einbinden („Durchsuche meine Dateien nach …“)
+- [x] **MCP-Server** `localrag mcp` → in Claude Desktop/Code einbinden („Durchsuche meine Dateien nach …“) *(Code steht, Tests ausstehend)*
 - [ ] Optional: Tray-App mit globalem Hotkey
 
 ### Phase 6 – Profi-Extras (optional, je nach Lust)

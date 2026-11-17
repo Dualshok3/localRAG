@@ -52,23 +52,64 @@ uv run localrag search "…" --local   # Dienst ignorieren
 Der Dienst bietet auch eine HTTP-API (`/search`, `/ask`, `/health`, Doku unter `http://127.0.0.1:8765/docs`).
 Weil er Inhalte deiner Dateien herausgibt, bindet er standardmäßig nur an 127.0.0.1.
 
+### Als Werkzeug für Claude (MCP)
+
+Mit `localrag mcp` bekommen Claude Desktop, Claude Code und andere MCP-Clients drei Werkzeuge:
+`search_files`, `read_passage` (Volltext eines Treffers samt Nachbarabschnitten) und `index_status`.
+Der Assistent kann damit mehrfach suchen und gezielt nachlesen.
+
+```bash
+uv sync --extra semantic --extra mcp
+claude mcp add localrag -- uv --directory C:\pfad\zu\RAG run localrag mcp --allow "D:\Dokumente"
+```
+
+Für Claude Desktop in `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "localrag": {
+      "command": "uv",
+      "args": ["--directory", "C:\\pfad\\zu\\RAG", "run", "localrag", "mcp", "--allow", "D:\\Dokumente"],
+      "env": { "LOCALRAG_DB": "D:\\localrag\\localrag.db", "LOCALRAG_MODELS": "D:\\localrag\\models" }
+    }
+  }
+}
+```
+
+> **Datenschutz:** Was die Werkzeuge zurückgeben, landet im Kontext des Assistenten. Bei einem
+> Cloud-Modell verlassen diese Ausschnitte deinen Rechner, anders als bei `localrag ask` mit LM Studio.
+> Mit `--allow` lässt sich die Herausgabe auf bestimmte Ordner begrenzen. Treffer aus anderen Ordnern
+> verschweigt der Server dann komplett.
+
 ## Messung: Stichwort vs. Vektor vs. Hybrid
 
-Synthetischer Testkorpus mit 10 Dokumenten und 25 Fragen ([eval/results/latest.md](eval/results/latest.md)):
+Synthetischer Testkorpus mit 16 Dokumenten und 35 Fragen ([eval/results/latest.md](eval/results/latest.md)).
+Er enthält absichtlich ähnliche Dokumente als Fallen: Stromrechnung 2023 und 2024, Wohnungs- und
+Garagenmietvertrag, alter und aktueller Arbeitsvertrag.
 
-| Fragen | n | BM25 | Vektor (bge-m3) | **Hybrid (RRF)** |
+| Fragen | n | BM25 | Vektor (bge-m3) | Hybrid (RRF) |
 |---|---|---|---|---|
-| Stichworte aus dem Dokument | 11 | 1.00 | 1.00 | **1.00** |
-| Umschreibungen („Darf ich eine Katze halten?“ → *Haustiere*) | 10 | 0.00 | 1.00 | **0.90** |
-| Exakte Kennungen (Seriennummer, IP, Betrag) | 4 | 1.00 | 0.50 | **1.00** |
-| **Gesamt** | 25 | 0.60 | 0.92 | **0.96** |
+| Stichworte aus dem Dokument | 12 | 1.00 | 1.00 | 1.00 |
+| Umschreibungen („Darf ich eine Katze halten?“ → *Haustiere*) | 13 | 0.23 | **0.92** | 0.69 |
+| Exakte Kennungen (Seriennummer, IP, Betrag) | 5 | **1.00** | 0.40 | **1.00** |
+| Ähnliche Dokumente unterscheiden („Strom **2023**“) | 5 | 0.20 | **1.00** | 0.60 |
+| **Gesamt** | 35 | 0.60 | **0.89** | 0.83 |
 
-Angegeben ist Recall@1, also wie oft die richtige Datei auf Platz 1 steht. Bei Recall@5 erreichen
-Vektor und Hybrid jeweils 1.00. Das Bild ist klar: BM25 scheitert an Umschreibungen, Vektoren an exakten
-Kennungen, und Hybrid gleicht beides aus.
+Angegeben ist Recall@1, also wie oft die richtige Datei auf Platz 1 steht. Bei Recall@3 erreichen
+Vektor und Hybrid jeweils 1.00, die richtige Datei ist also immer unter den ersten drei. Latenz pro Suche
+auf der GPU: rund 22 ms.
 
-Einschränkung: Mit 10 Dokumenten ist der Korpus klein und leicht. Ein größeres, schwierigeres Eval-Set
-ist für Phase 3 geplant. Selbst messen: `uv run python eval/run_eval.py`
+Was man daraus lernt:
+- **BM25** scheitert an Umschreibungen, **Vektoren** an exakten Kennungen.
+- **Hybrid** ist bei Kennungen perfekt, verliert aber bei Umschreibungen Plätze. Einfaches RRF gewichtet
+  beide Listen gleich. Findet BM25 nur zufällige Wortübereinstimmungen in falschen Dateien, schieben
+  diese den richtigen Vektor-Treffer auf Platz 2 oder 3.
+- Hybrid bleibt der Standard, weil es nie komplett danebenliegt. Für Platz 1 ist der nächste Schritt ein
+  Reranker (Phase 3), der die Top-Kandidaten noch einmal genau bewertet.
+
+Einschränkung: 35 Fragen sind wenig, ein bis zwei Fragen verschieben die Werte um mehrere Prozentpunkte.
+Selbst messen: `uv run python eval/run_eval.py`
 
 ## Idee
 

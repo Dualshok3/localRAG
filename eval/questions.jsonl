@@ -23,3 +23,13 @@
 {"question": "1ESY-0000-TEST", "expected": "stromrechnung_2024.md", "type": "exact-id"}
 {"question": "192.168.0.1", "expected": "router_manual.md", "type": "exact-id"}
 {"question": "2.306 EUR", "expected": "nebenkostenabrechnung_2023.md", "type": "exact-id"}
+{"question": "Wie hoch war der Stromverbrauch im Jahr 2023?", "expected": "stromrechnung_2023.md", "type": "disambiguation"}
+{"question": "Wie lange ist die Kündigungsfrist für die Garage?", "expected": "garagenmietvertrag.md", "type": "disambiguation"}
+{"question": "Wie viele Urlaubstage hatte ich beim alten Arbeitgeber?", "expected": "alter_arbeitsvertrag_2019.md", "type": "disambiguation"}
+{"question": "Wie viel verdiene ich aktuell brutto?", "expected": "arbeitsvertrag.md", "type": "disambiguation"}
+{"question": "Ist mein Rad versichert, wenn es geklaut wird?", "expected": "hausratversicherung.md", "type": "paraphrase"}
+{"question": "Wann war die erste Inspektion vom Rad fällig?", "expected": "fahrrad_kaufbeleg.md", "type": "paraphrase"}
+{"question": "Was zahlt die Krankenkasse bei der Zahnreinigung dazu?", "expected": "zahnarzt_rechnung.md", "type": "keyword"}
+{"question": "WTEST-998877", "expected": "fahrrad_kaufbeleg.md", "type": "exact-id"}
+{"question": "Darf ich Benzinkanister in der Garage lagern?", "expected": "garagenmietvertrag.md", "type": "paraphrase"}
+{"question": "Gab es 2023 eine Rückzahlung vom Stromanbieter?", "expected": "stromrechnung_2023.md", "type": "disambiguation"}

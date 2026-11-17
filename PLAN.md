@@ -284,6 +284,7 @@ RAG/
   4. mit vs. ohne `heading_path`-Kontext
   5. Embedding-Modelle im Vergleich
 - [ ] **Benchmark gegen Windows-Suche** auf denselben Fragen (Wie oft ist die richtige Datei in den Top 5?)
+  *(erster Lauf auf echten Dateien, 22 Fragen: Hybrid Recall@5 0,95 gegenüber Windows-Suche 0,27. Die Windows-Suche kennt D: nicht und scheitert an ganzen Sätzen. Neue Prioritäten aus dem Test: OCR für Scans, Duplikate zusammenfassen, Fragen ohne gemeinsame Wörter ins Set aufnehmen)*
 
 **Ergebnis:** Eine Tabelle wie „Hybrid + Rerank: Recall@5 = 0,91 vs. Windows-Suche 0,34“ – genau so etwas
 überzeugt beim Lesen eines GitHub-Profils.

@@ -156,6 +156,53 @@ Was man daraus lernt:
 Einschränkung: 35 Fragen sind wenig, ein bis zwei Fragen verschieben die Werte um mehrere Prozentpunkte.
 Selbst messen: `uv run python eval/run_eval.py`
 
+## Test mit echten Dateien
+
+Auch an einem echten Rechner getestet: Desktop, Dokumente, Downloads und ein Studienordner mit 334 Dateien.
+Darunter sind Verträge, Studienunterlagen, eine Abschlussarbeit, fünf Fachbücher mit mehreren hundert
+Seiten und typischer Ballast wie Spiele-Konfigurationen. Die Fragen und Daten bleiben privat, hier stehen
+nur die Zahlen. Hardware: RTX 5060 Ti 16 GB.
+
+| Schritt | Zeit |
+|---|---|
+| Text extrahieren + Stichwortindex (334 Dateien → 6.788 Abschnitte) | 33 s |
+| Vektoren berechnen (bge-m3, GPU) | 102 s (~67 Abschnitte/s) |
+| Zweiter Lauf, nichts geändert | 0,2 s |
+| Indexgröße | 66 MB |
+
+| Suche | p50 | p95 |
+|---|---|---|
+| Stichwort (im Prozess) | 4,6 ms | 10 ms |
+| Hybrid (im Prozess, inkl. Frage einbetten) | 51 ms | 64 ms |
+| Hybrid über den Dienst (HTTP) | 117 ms | 139 ms |
+| `localrag search` über den Dienst (inkl. Python-Start) | ~2 s | |
+| `localrag search` ohne Dienst (Modell wird geladen) | ~19 s | |
+| `localrag ask` mit Gemma 4 26B über den Dienst | 6–8 s | |
+
+**Trefferquote** bei 22 beantwortbaren Fragen mit bekannter richtiger Datei:
+
+| | BM25 | Vektor | Hybrid | Windows-Suche |
+|---|---|---|---|---|
+| Recall@1 | 0.82 | 0.73 | **0.82** | 0.27 |
+| Recall@5 | 0.91 | 0.91 | **0.95** | 0.27 |
+
+Die Windows-Suche indexiert standardmäßig nur die Benutzerordner auf C:, der Studienordner auf D: fehlt
+ihr komplett. Nur auf die Fragen zu Dateien gerechnet, die sie kennt, findet sie 6 von 13. Ganze Sätze
+liefern dort fast immer null Treffer, nur Stichworte und Kennungen funktionieren.
+
+Was der echte Test zusätzlich gezeigt hat:
+- **Scans:** 8 PDFs haben keine Textebene, etwa ein eingescanntes Zeugnis. Ohne OCR sind sie
+  unauffindbar, deshalb hat OCR jetzt hohe Priorität.
+- **Duplikate:** Viele fast identische Versionen derselben Datei, etwa automatische Backups, belegen
+  alle Top-Plätze. Hier braucht es eine Zusammenfassung nahezu gleicher Treffer.
+- **Kürzel-Dokumente:** Rechnungen aus Großbuchstaben-Kürzeln findet keine Methode über eine
+  umschriebene Frage.
+- **Leere Antworten:** Gemma lieferte bei einer unbeantwortbaren Frage eine leere Antwort. Das ist
+  behoben, jetzt kommt der feste Satz „nichts gefunden“.
+- **Einschränkung:** Die Fragen entstanden nach dem Lesen der Dokumente und teilen deshalb oft Wörter mit
+  ihnen. Das begünstigt BM25. Im synthetischen Korpus mit härteren Umschreibungen ist die Vektorsuche
+  klar überlegen.
+
 ## Architektur
 
 ```mermaid

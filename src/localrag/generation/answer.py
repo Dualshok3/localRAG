@@ -73,4 +73,8 @@ def stream_answer(
         parts.append(piece)
         yield piece
     result.text = "".join(parts).strip()
+    if not result.text:
+        # Manche Modelle schweigen, statt den vorgegebenen Satz zu sagen (z. B. alles im Reasoning)
+        result.text = NO_ANSWER
+        yield NO_ANSWER
     result.cited = extract_citations(result.text, len(result.sources))

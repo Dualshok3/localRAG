@@ -154,6 +154,14 @@ def test_no_sources_means_no_llm_call():
     assert server.requests == []
 
 
+def test_empty_model_output_becomes_no_answer():
+    # Echter Fall mit Gemma 4: bei unbeantwortbarer Frage kam gar kein Text zurück
+    result = AnswerResult("Frage", sources=[hit("x")])
+    with client_for(FakeServer(["", "  "]), "m") as client:
+        assert "".join(stream_answer(client, result)).strip() == NO_ANSWER
+    assert result.is_no_answer and result.text == NO_ANSWER
+
+
 def test_no_answer_is_recognised_even_with_extra_words():
     result = AnswerResult(
         "Frage", sources=[hit("x")], text="Leider: dazu habe ich in deinen Dateien nichts gefunden."

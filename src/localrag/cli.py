@@ -1,4 +1,4 @@
-"""Kommandozeile: ``localrag index``, ``localrag search``, ``localrag status``."""
+"""Kommandozeile: ``localrag index``, ``search``, ``ask``, ``status``."""
 
 from __future__ import annotations
 
@@ -17,6 +17,9 @@ from rich.text import Text
 
 from localrag import __version__
 from localrag.config import DEFAULT_EXCLUDED_DIRS, DEFAULT_MAX_FILE_MB, ENV_DB, default_db_path
+from localrag.generation.answer import AnswerResult, retrieve_sources, stream_answer
+from localrag.generation.llm import ENV_LLM_MODEL, ENV_LLM_URL, ChatClient, LLMError
+from localrag.generation.prompts import source_label
 from localrag.index.db import Database
 from localrag.index.embedder import Embedder, SemanticUnavailableError, load_embedder, semantic_available
 from localrag.index.vector_store import EmbeddingModelMismatchError, VectorStore
@@ -190,6 +193,90 @@ def search(
         snippet.highlight_words(h.matched_words, style="bold yellow", case_sensitive=False)
         console.print(snippet)
     console.print(f"[dim]{len(hits)} Treffer in {elapsed_ms:.0f} ms ({resolved})[/dim]")
+
+
+@app.command()
+def ask(
+    question: Annotated[str, typer.Argument(help="Frage in natürlicher Sprache.")],
+    db: DbOption,
+    k: Annotated[int, typer.Option("--sources", "-k", help="Maximale Anzahl Textstellen als Kontext.")] = 6,
+    mode: Annotated[
+        str, typer.Option("--mode", "-m", help="Suchmodus: auto | keyword | semantic | hybrid")
+    ] = "auto",
+    filetype: Annotated[list[str] | None, typer.Option("--type", "-t", help="Nur diese Dateitypen.")] = None,
+    llm_url: Annotated[
+        str | None, typer.Option("--llm-url", envvar=ENV_LLM_URL, help="OpenAI-kompatibler Server.")
+    ] = None,
+    llm_model: Annotated[
+        str | None, typer.Option("--llm-model", envvar=ENV_LLM_MODEL, help="Modell-ID, z. B. qwen3.5-9b.")
+    ] = None,
+    show_context: Annotated[
+        bool, typer.Option("--show-context", help="Alle übergebenen Textstellen zeigen.")
+    ] = False,
+) -> None:
+    """Beantwortet eine Frage aus deinen Dateien – mit Quellenangaben (lokales LLM, z. B. LM Studio)."""
+    if not db.exists():
+        console.print(f"[red]Kein Index unter {db}[/red] – zuerst `localrag index <ordner>` ausführen.")
+        raise typer.Exit(1)
+    if mode not in ("auto", "keyword", "semantic", "hybrid"):
+        console.print(f"[red]Unbekannter Modus {mode!r}[/red]")
+        raise typer.Exit(2)
+
+    with Database(db) as database, ChatClient(llm_url, llm_model) as client:
+        try:
+            model_name = client.model  # früh prüfen, ob der Server läuft
+        except LLMError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from exc
+
+        embedder = _load_embedder_for_search(database, mode)
+        resolved = "keyword" if embedder is None else ("hybrid" if mode == "auto" else mode)
+        started = time.perf_counter()
+        sources = retrieve_sources(
+            database,
+            question,
+            embedder=embedder,
+            mode=resolved,
+            k=k,
+            filetypes=filetype,  # type: ignore[arg-type]
+        )
+        search_ms = (time.perf_counter() - started) * 1000
+        result = AnswerResult(question=question, sources=sources)
+
+        if show_context:
+            for i, h in enumerate(sources, start=1):
+                console.print(f"[dim][{i}] {source_label(h)}[/dim]")
+
+        started = time.perf_counter()
+        try:
+            with console.status(f"{model_name} denkt nach…") as status:
+                first = True
+                for piece in stream_answer(client, result):
+                    if first:
+                        status.stop()
+                        first = False
+                    console.print(piece, end="", markup=False, highlight=False, soft_wrap=True)
+        except LLMError as exc:
+            console.print(f"\n[red]{exc}[/red]")
+            raise typer.Exit(1) from exc
+        answer_s = time.perf_counter() - started
+    console.print()
+
+    if result.cited_sources:
+        console.print("\n[bold]Quellen[/bold]")
+        for n, h in result.cited_sources:
+            location = f"  · Seite {h.page}" if h.page else ""
+            if not location and h.heading_path:
+                location = f"  · {h.heading_path}"
+            console.print(Text.assemble((f"[{n}] ", "bold"), (h.path, "cyan"), (location, "dim")))
+    elif sources and not result.is_no_answer:
+        console.print(
+            "\n[yellow]Die Antwort enthält keine Quellenangabe – bitte mit Vorsicht lesen.[/yellow]"
+        )
+    console.print(
+        f"[dim]Suche {search_ms:.0f} ms ({resolved}, {len(sources)} Textstellen) · "
+        f"Antwort {answer_s:.1f} s ({model_name})[/dim]"
+    )
 
 
 def _load_embedder_for_index(embed: bool | None, model: str | None) -> Embedder | None:

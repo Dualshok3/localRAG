@@ -2,7 +2,7 @@
 
 > Frag deinen Computer in natürlicher Sprache – komplett lokal, mit Quellenangabe.
 
-**Status:** 🚧 Phase 1 fertig: Hybrid-Suche aus BM25 und Vektoren (bge-m3) über PDF, DOCX, Markdown und TXT. Als Nächstes kommen Antworten per lokalem LLM, siehe [PLAN.md](PLAN.md).
+**Status:** 🚧 Hybrid-Suche aus BM25 und Vektoren (bge-m3) über PDF, DOCX, Markdown und TXT. Antworten mit Quellenangabe per lokalem LLM (LM Studio) funktionieren, die Antwortqualität ist aber noch nicht gemessen. Details in [PLAN.md](PLAN.md).
 
 ## Quickstart
 
@@ -22,6 +22,23 @@ uv run localrag status --errors
 | `LOCALRAG_DB` | Index-Datenbank (auch `--db`) | `~/.localrag/localrag.db` |
 | `LOCALRAG_MODELS` | Speicherort der Modelle (~4,5 GB) | Hugging-Face-Cache |
 | `LOCALRAG_EMBEDDING_MODEL` | Embedding-Modell | `BAAI/bge-m3` |
+| `LOCALRAG_LLM_URL` | OpenAI-kompatibler Chat-Server | `http://localhost:1234/v1` (LM Studio) |
+| `LOCALRAG_LLM_MODEL` | Modell-ID auf dem Server | bereits geladenes Modell |
+
+### Fragen beantworten (lokales LLM)
+
+`localrag ask` sucht die passenden Textstellen und lässt ein lokales Sprachmodell daraus eine Antwort mit
+Quellenangaben formulieren. Getestet mit [LM Studio](https://lmstudio.ai). Jeder OpenAI-kompatible Server
+funktioniert ebenso (llama.cpp, vLLM, Ollama).
+
+```bash
+lms server start                     # LM-Studio-Server
+lms load qwen3.5-9b                  # oder ein anderes Modell
+uv run localrag ask "Wie hoch ist der neue Stromabschlag?"
+```
+
+Das Modell bekommt nur die gefundenen Textstellen und soll jede Aussage mit `[n]` belegen. Steht die
+Antwort nicht in den Quellen, sagt es „Dazu habe ich in deinen Dateien nichts gefunden.“
 
 Beim ersten Start wird bge-m3 heruntergeladen. Die CLI lädt das Modell bei jeder Suche neu, das dauert
 einige Sekunden. Die Suche selbst braucht danach ~30 ms (RTX 5060 Ti). Ein dauerhaft laufender Dienst
@@ -59,7 +76,7 @@ Die Kündigungsfrist beträgt drei Monate zum Monatsende [1].
 
 ## Geplante Features
 
-- 🔒 **100 % lokal** – keine Daten verlassen den Rechner (Ollama + lokale Embeddings)
+- 🔒 **100 % lokal** – keine Daten verlassen den Rechner (LM Studio oder jeder andere OpenAI-kompatible Server + lokale Embeddings)
 - 🔎 **Hybrid-Suche** – semantische Vektorsuche + BM25-Stichwortsuche + Reranking
 - 📄 PDF, Word, Excel, PowerPoint, Markdown, E-Mails, Quellcode, OCR für Scans
 - ⚡ **Inkrementelle Indexierung** – nur geänderte Dateien werden neu verarbeitet
@@ -73,12 +90,12 @@ flowchart LR
     F[Dateien] --> P[Parser + OCR] --> C[Chunker] --> E[Embeddings bge-m3]
     E --> V[(SQLite sqlite-vec)]
     C --> B[(SQLite FTS5)]
-    Q[Frage] --> V & B --> R[RRF + Reranker] --> L[LLM via Ollama] --> A[Antwort + Zitate]
+    Q[Frage] --> V & B --> R[RRF + Reranker] --> L[LLM via LM Studio] --> A[Antwort + Zitate]
 ```
 
 ## Tech-Stack
 
-Python 3.12 · uv · PyTorch/CUDA · sentence-transformers · SQLite (FTS5 + sqlite-vec) · Ollama · FastAPI · Typer · MCP
+Python 3.12 · uv · PyTorch/CUDA · sentence-transformers · SQLite (FTS5 + sqlite-vec) · LM Studio (OpenAI-API) · httpx · FastAPI · Typer · MCP
 
 ## Lizenz
 

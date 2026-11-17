@@ -142,7 +142,7 @@ Was es **besonders** macht (statt nur LangChain-Tutorial nachgebaut):
 | Volltext | **SQLite FTS5** (BM25) + deutscher Snowball-Stemmer vorab in Python | Tantivy | FTS5 kann nur englisches Stemming. Deshalb Text vor dem Einfügen normalisieren. |
 | Vektoren | **sqlite-vec** (int8/binär möglich) | NumPy/Torch Brute-Force, LanceDB, Qdrant | Keine separate Vektor-DB nötig. Hinter einem Interface gekapselt, damit ein Wechsel später möglich ist. |
 | Reranker | **BAAI/bge-reranker-v2-m3** | mxbai-rerank | Mehrsprachig, deutliche Qualitätssteigerung. |
-| LLM | **Ollama** mit z. B. Qwen3 8B / Gemma 3 12B / Llama 3.1 8B | llama.cpp, LM Studio, optional Claude API | Einfach, lokal, OpenAI-kompatible API. |
+| LLM | **LM Studio** (lokaler Server, OpenAI-kompatible API) mit z. B. Qwen3.5 9B | llama.cpp, vLLM, Ollama, optional Claude API | Schon installiert. Der Client spricht die Standard-OpenAI-API und ist damit nicht an LM Studio gebunden. |
 | Datei-Watcher | **watchdog** | Windows USN-Journal | Später USN-Journal für Profi-Bonus (so arbeitet auch Everything). |
 | API | **FastAPI** | Flask | Async, Streaming, automatische Doku. |
 | UI | Phase 1: **Typer**-CLI · Phase 2: Web-UI (FastAPI + HTMX oder React) · Phase 3: Tray-App mit Hotkey | Streamlit, Gradio | CLI zuerst = schnell testbar. |
@@ -173,7 +173,7 @@ Was es **besonders** macht (statt nur LangChain-Tutorial nachgebaut):
                                                                   │
                     ┌─────────────────────────────────────────────▼───────────┐
                     │ Query-Engine: Query-Embed → Hybrid (RRF) → Filter →      │
-                    │ Rerank → Prompt bauen → LLM (Ollama) → Antwort + Zitate  │
+                    │ Rerank → Prompt bauen → LLM (LM Studio) → Antwort + Zitate  │
                     └───────┬─────────────────┬─────────────────┬──────────────┘
                             │                 │                 │
                          CLI (Typer)     FastAPI + Web-UI    MCP-Server
@@ -220,7 +220,7 @@ RAG/
 │   │   ├── hybrid.py       # RRF
 │   │   └── reranker.py
 │   ├── generation/
-│   │   ├── llm.py          # Ollama-Client
+│   │   ├── llm.py          # OpenAI-kompatibler Client (LM Studio)
 │   │   └── prompts.py
 │   ├── api/                # FastAPI
 │   ├── mcp_server.py
@@ -243,7 +243,7 @@ RAG/
 ### Phase 0 – Setup (½ Tag)
 - [x] `uv init`, Python 3.12, `pyproject.toml`, ruff, pytest, pre-commit
 - [x] GitHub Actions CI (Lint + Tests + Eval + gitleaks)
-- [ ] Ollama installieren, Modell ziehen, CUDA-Check (`torch.cuda.is_available()`)
+- [x] LM Studio vorhanden, CUDA-Check (`torch.cuda.is_available()`) ✓ RTX 5060 Ti
 - [ ] Testkorpus anlegen: ~200 eigene, *unkritische* Dateien in `D:\rag-testdata`
 
 **Ergebnis:** Grünes CI-Badge, lauffähiges Grundgerüst.
@@ -266,8 +266,9 @@ RAG/
 **Ergebnis:** Funktionierende Hybrid-Suche in einer SQLite-Datei. Erstes Demo-GIF fürs README.
 
 ### Phase 2 – Antworten generieren (3–4 Tage)
-- [ ] Ollama-Anbindung, Prompt mit nummerierten Quellen `[1] [2]`
-- [ ] `localrag ask "<frage>"` mit Streaming-Ausgabe und Zitaten
+- [x] LM-Studio-Anbindung (OpenAI-kompatibel, Streaming, `<think>`-Filter), Prompt mit nummerierten Quellen `[1] [2]`
+- [x] `localrag ask "<frage>"` mit Streaming-Ausgabe und Zitaten
+- [ ] Antwortqualität messen: erster Live-Test mit Qwen3.5-9B: 2 von 3 korrekt, eine Klausel falsch gelesen (Katze/Haustiere). Antwortzeit 8–56 s, Ursache noch offen (kein Reasoning)
 - [ ] „Ich weiß es nicht“-Verhalten, wenn nichts Relevantes gefunden wird
 
 **Ergebnis:** Echter RAG – Frage rein, Antwort mit Quellen raus.
@@ -335,7 +336,7 @@ RAG/
 - [ ] Saubere Commits (Conventional Commits: `feat:`, `fix:`, `docs:`), Issues/Milestones pro Phase
 - [ ] `docs/adr/` – kurze Entscheidungsdokumente („Warum SQLite statt Vektordatenbank?“) – zeigt Engineering-Denken
 - [ ] Tests mit sinnvoller Abdeckung (Parser, Chunker, RRF sind gut testbar)
-- [ ] Repo-Topics: `rag`, `llm`, `semantic-search`, `local-first`, `ollama`, `vector-database`, `mcp`
+- [ ] Repo-Topics: `rag`, `llm`, `semantic-search`, `local-first`, `lm-studio`, `vector-database`, `mcp`
 - [ ] Releases mit Changelog
 - [ ] Profil-README verlinkt das Projekt als Highlight
 
@@ -361,6 +362,6 @@ RAG/
 
 ## 11. Nächster konkreter Schritt
 
-1. Phase 0 umsetzen (Projektgerüst, CI, Ollama + CUDA-Check)
+1. Phase 0 umsetzen (Projektgerüst, CI, LM Studio + CUDA-Check)
 2. Testordner mit ~200 Dateien auf `D:` anlegen
 3. Phase 1a starten: erster `localrag search`-Aufruf mit BM25

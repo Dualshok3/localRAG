@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:  # manuell starten → gitleaks prüft dann die komplette Historie
 
 jobs:
   test:

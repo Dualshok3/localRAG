@@ -30,9 +30,9 @@ def problem(path: str) -> str | None:
     if suffix in DATABASE_EXTENSIONS:
         return "sieht nach Index/Datenbank aus"
     if suffix in DOCUMENT_EXTENSIONS and not str(p).startswith(ALLOWED_PREFIXES):
-        return f"Dokument/Bild ({suffix}) außerhalb von {', '.join(ALLOWED_PREFIXES)}"
+        return f"Dokument/Bild ({suffix}) ausserhalb von {', '.join(ALLOWED_PREFIXES)}"
     if p.name.lower().startswith(".env") and p.name.lower() != ".env.example":
-        return "Umgebungsdatei mit möglichen Secrets"
+        return "Umgebungsdatei mit moeglichen Secrets"
     return None
 
 
@@ -41,7 +41,7 @@ def main(argv: list[str]) -> int:
     for f, reason in hits:
         print(f"BLOCKIERT: {f} -> {reason}")
     if hits:
-        print("\nPrivate Daten gehören nicht ins Repo. Synthetische Testdateien nach tests/fixtures/ legen.")
+        print("\nPrivate Daten gehoeren nicht ins Repo. Synthetische Testdateien nach tests/fixtures/ legen.")
     return 1 if hits else 0
 
 

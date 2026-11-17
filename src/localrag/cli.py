@@ -81,7 +81,9 @@ def serve(
     import uvicorn
 
     from localrag.api.server import create_app
+    from localrag.index.vector_store import enable_memory_cache
 
+    enable_memory_cache()  # lang laufender Prozess → Vektoren im Arbeitsspeicher halten
     if host not in ("127.0.0.1", "localhost", "::1"):
         console.print(
             f"[bold red]Achtung:[/bold red] Mit --host {host} sind Inhalte deiner Dateien im Netzwerk lesbar."
@@ -110,7 +112,10 @@ def mcp_command(
 ) -> None:
     """MCP-Server (stdio) für Claude Desktop / Claude Code: Suche in deinen Dateien als Werkzeug."""
     from localrag.api.server import default_embedder_for
+    from localrag.index.vector_store import enable_memory_cache
     from localrag.mcp_server import FileSearchTools, build_server
+
+    enable_memory_cache()
 
     # stdout gehört dem MCP-Protokoll → keine Konsolenausgaben hier
     tools = FileSearchTools(
@@ -215,6 +220,8 @@ def index(
             else "z. B. gescannte PDFs → OCR mit `uv sync --extra ocr`"
         )
         console.print(f"[yellow]{stats.empty} Dateien ohne Text[/yellow] ({hint})")
+    if stats.skipped:
+        console.print(f"[dim]{stats.skipped} Wort-/Datenlisten übersprungen[/dim]")
     if stats.failed:
         console.print(f"[red]{stats.failed} Fehler[/red] – Details mit `localrag status --errors`")
     console.print(f"[dim]Index: {db}[/dim]")
@@ -555,7 +562,8 @@ def status(
     console.print(table)
     console.print(
         f"Dokumente: {sum(by_status.values())} (ok {by_status.get('ok', 0)}, ohne Text "
-        f"{by_status.get('empty', 0)}, Fehler {by_status.get('error', 0)}) · Chunks: {st['chunks']}"
+        f"{by_status.get('empty', 0)}, übersprungen {by_status.get('skipped', 0)}, "
+        f"Fehler {by_status.get('error', 0)}) · Chunks: {st['chunks']}"
     )
     console.print(vec_info)
     for path, err in error_rows:

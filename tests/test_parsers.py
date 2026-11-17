@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from localrag.ingest.parsers import ParseError, parse
+from localrag.ingest.parsers import ParseError, SkippedFile, parse
 
 from .conftest import make_docx, make_pdf
 
@@ -88,3 +88,41 @@ def test_unsupported_type(tmp_path: Path):
     f.write_text("x")
     with pytest.raises(ParseError):
         parse(f)
+
+
+@pytest.mark.parametrize("encoding", ["utf-16", "utf-16-le"])  # mit BOM bzw. ohne BOM
+def test_utf16_text_files_are_read(tmp_path: Path, encoding: str):
+    path = tmp_path / "einstellungen.txt"
+    path.write_bytes("Auflösung: 1920x1080\r\nSprache: Deutsch\r\n".encode(encoding))
+    assert "Auflösung: 1920x1080" in parse(path)[0].text
+
+
+def test_real_binary_in_txt_is_still_rejected(tmp_path: Path):
+    path = tmp_path / "kaputt.txt"
+    path.write_bytes(b"\r\x00\x00\x001.89.214\x00\x07\x00\xff\x10binary\x00\x00data" * 20)
+    with pytest.raises(ParseError):
+        parse(path)
+
+
+def test_word_lists_are_skipped(tmp_path: Path):
+    path = tmp_path / "wörterbuch.txt"
+    path.write_text("\n".join(f"Wort{i}" for i in range(500)), encoding="utf-8")
+    with pytest.raises(SkippedFile, match="Wort- oder Datenliste"):
+        parse(path)
+
+
+def test_single_line_data_dumps_are_skipped(tmp_path: Path):
+    path = tmp_path / "meta.txt"
+    path.write_text("{'a': 1, " * 10_000 + "}", encoding="utf-8")
+    with pytest.raises(SkippedFile, match="Daten-Dump"):
+        parse(path)
+
+
+def test_long_notes_with_sentences_are_kept(tmp_path: Path):
+    lines = []
+    for i in range(400):
+        lines.append(f"Punkt {i}")
+        lines.append(f"Heute habe ich die Aufgabe Nummer {i} fertig erledigt und abgegeben.")
+    path = tmp_path / "tagebuch.txt"
+    path.write_text("\n".join(lines), encoding="utf-8")
+    assert parse(path)

@@ -230,3 +230,59 @@ def test_blended_rerank_keeps_a_clear_first_stage_winner(db: Database, tmp_path:
     # Ersetzen: Reranker entscheidet allein. Mischen mit kleinem Gewicht: Platz 1 der ersten Stufe bleibt.
     assert names(search(db, "Reparatur", mode="keyword", reranker=rr, rerank_blend=None))[0] == "b.md"
     assert names(search(db, "Reparatur", mode="keyword", reranker=rr, rerank_blend=0.5))[0] == "a.md"
+
+
+@pytest.fixture
+def memory_cache():
+    from localrag.index.vector_store import enable_memory_cache
+
+    enable_memory_cache()
+    yield
+    enable_memory_cache(False)
+
+
+def test_memory_cache_gives_same_results_as_sqlite_vec(tmp_path: Path, corpus: Path, memory_cache):
+    from localrag.index import vector_store
+
+    with Database(tmp_path / "mem.db") as db:
+        emb = HashingEmbedder()
+        index_paths(db, [corpus], embedder=emb)
+        q = emb.embed_query("Kündigungsfrist Wohnung")
+        in_memory = VectorStore(db).search(q, k=5)
+        vector_store.enable_memory_cache(False)
+        on_disk = VectorStore(db).search(q, k=5)
+    # Gleiche Abstände in gleicher Reihenfolge; bei Gleichstand darf die Reihenfolge der IDs abweichen
+    assert in_memory[0].chunk_id == on_disk[0].chunk_id
+    assert all(abs(a.distance - b.distance) < 1e-4 for a, b in zip(in_memory, on_disk, strict=True))
+
+
+def test_memory_cache_sees_newly_indexed_files(tmp_path: Path, corpus: Path, memory_cache):
+    emb = HashingEmbedder()
+    db_path = tmp_path / "mem.db"
+    with Database(db_path) as db:
+        index_paths(db, [corpus], embedder=emb)
+        assert names(search(db, "Zitronenfalter Garten", mode="semantic", embedder=emb))[0] != "garten.md"
+
+    extra = tmp_path / "neu"
+    extra.mkdir()
+    (extra / "garten.md").write_text("Im Garten flog ein Zitronenfalter.", encoding="utf-8")
+    with Database(db_path) as other:  # anderer Prozess indexiert, während die Kopie im Speicher liegt
+        index_paths(other, [extra], embedder=emb)
+
+    with Database(db_path) as db:
+        assert names(search(db, "Zitronenfalter Garten", mode="semantic", embedder=emb))[0] == "garten.md"
+
+
+def test_fast_block_loading_matches_row_by_row_even_after_deletions(tmp_path: Path, corpus: Path):
+    with Database(tmp_path / "blocks.db") as db:
+        index_paths(db, [corpus], embedder=HashingEmbedder())
+        doc = next(db.iter_document_paths())
+        db.delete_document(doc)  # hinterlässt eine Lücke im Block
+        store = VectorStore(db)
+        dim = int(db.get_meta("embedding_dim") or 0)
+        fast = store._load_from_blocks(dim)
+        slow = store._load_row_by_row(dim)
+    assert fast is not None
+    order_fast, order_slow = np.argsort(fast[0]), np.argsort(slow[0])
+    assert np.array_equal(fast[0][order_fast], slow[0][order_slow])
+    assert np.array_equal(fast[1][order_fast], slow[1][order_slow])

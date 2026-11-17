@@ -116,6 +116,10 @@ class Database:
         else:
             self.conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?)", (key, value))
 
+    def bump_vectors_version(self) -> None:
+        """Markiert die Vektoren als geändert – Kopien im Arbeitsspeicher laden dann neu."""
+        self.set_meta("vectors_version", str(time.time_ns()))
+
     def has_table(self, name: str) -> bool:
         row = self.conn.execute("SELECT 1 FROM sqlite_master WHERE name = ?", (name,)).fetchone()
         return row is not None
@@ -211,6 +215,7 @@ class Database:
                 "DELETE FROM chunks_vec WHERE rowid IN (SELECT id FROM chunks WHERE document_id = ?)",
                 (doc_id,),
             )
+            self.bump_vectors_version()
         c.execute("DELETE FROM chunks WHERE document_id = ?", (doc_id,))
 
     # --- Statistik -----------------------------------------------------------------------------

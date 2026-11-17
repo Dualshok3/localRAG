@@ -16,6 +16,10 @@ class ParseError(Exception):
     """Datei konnte nicht gelesen werden (kaputt, verschlüsselt, falsches Format)."""
 
 
+class SkippedFile(ParseError):
+    """Datei ist lesbar, aber kein Dokument (z. B. Wörterbuch, Daten-Dump) – bewusst nicht indexiert."""
+
+
 class HeadingStack:
     """Hält die aktuelle Überschriften-Hierarchie, z. B. 'Mietvertrag > §5 Kündigung'."""
 

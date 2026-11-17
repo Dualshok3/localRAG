@@ -6,7 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .base import ParseError, Section
+from .base import ParseError, Section, SkippedFile
 from .office import parse_docx
 from .pdf import parse_pdf
 from .text import parse_markdown, parse_txt
@@ -37,4 +37,4 @@ def parse(path: Path, ocr: OcrEngine | None = None) -> list[Section]:
     return parser(path)
 
 
-__all__ = ["PARSERS", "SUPPORTED_EXTENSIONS", "ParseError", "Section", "parse"]
+__all__ = ["PARSERS", "SUPPORTED_EXTENSIONS", "ParseError", "Section", "SkippedFile", "parse"]

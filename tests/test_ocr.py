@@ -132,3 +132,19 @@ def test_windows_ocr_reads_rendered_text(tmp_path: Path):
     sections = parse_pdf(make_scan(tmp_path / "scan.pdf", "Kündigungsfrist drei Monate"), ocr=WindowsOcr())
     text = " ".join(s.text for s in sections)
     assert "Monate" in text and "drei" in text
+
+
+def test_already_indexed_word_lists_are_dropped_after_parser_upgrade(db: Database, tmp_path: Path):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "vokabeln.txt").write_text("\n".join(f"Wort{i}" for i in range(500)), encoding="utf-8")
+    (docs / "notiz.txt").write_text("Ein ganz normaler Satz.", encoding="utf-8")
+    index_paths(db, [docs])
+    # Simulieren: Index stammt von einer Version, die Wortlisten noch indexierte
+    path = str((docs / "vokabeln.txt").resolve())
+    db.conn.execute("UPDATE documents SET status='ok', error=NULL, chunk_count=3 WHERE path=?", (path,))
+    db.set_meta("parser_version", "2")
+
+    stats = index_paths(db, [docs])
+    assert stats.updated == 1 and stats.unchanged == 1  # nur die Liste wird neu gelesen
+    assert db.get_document(path).status == "skipped"

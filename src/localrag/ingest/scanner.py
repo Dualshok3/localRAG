@@ -41,7 +41,11 @@ def iter_files(
             candidates = os.walk(root, onerror=lambda _err: None)
         for dirpath, dirnames, filenames in candidates:
             # In-place filtern → os.walk steigt in ausgeschlossene Ordner gar nicht erst ab
-            dirnames[:] = [d for d in dirnames if d.casefold() not in excluded and not d.startswith(".")]
+            dirnames[:] = [
+                d
+                for d in dirnames
+                if d.casefold() not in excluded and not d.startswith(".") and not _is_link(dirpath, d)
+            ]
             for name in filenames:
                 if name.startswith("~$"):  # Office-Sperrdateien
                     continue
@@ -55,6 +59,15 @@ def iter_files(
                 if st.st_size == 0 or st.st_size > max_bytes:
                     continue
                 yield FileInfo(path=full, mtime=st.st_mtime, size=st.st_size)
+
+
+def _is_link(dirpath: str, name: str) -> bool:
+    """Symlinks und Windows-Junctions überspringen (z. B. „Dokumente und Einstellungen“ → C:/Users).
+
+    Sonst würden Ordner doppelt oder in Schleifen gelesen, sobald man ein ganzes Laufwerk indexiert.
+    """
+    full = os.path.join(dirpath, name)
+    return os.path.islink(full) or os.path.isjunction(full)
 
 
 def is_under(path: str, root: Path) -> bool:

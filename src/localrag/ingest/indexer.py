@@ -14,7 +14,8 @@ from localrag.index.text_norm import normalize
 from localrag.index.vector_store import VectorStore
 from localrag.ingest.chunker import Chunk, chunk_sections
 from localrag.ingest.ocr import OcrEngine
-from localrag.ingest.parsers import ParseError, parse
+from localrag.ingest.parsers import ParseError, SkippedFile, parse
+from localrag.ingest.parsers.text import data_file_reason, read_text
 from localrag.ingest.scanner import FileInfo, is_under, iter_files
 
 ProgressCallback = Callable[[FileInfo, str], None]
@@ -29,6 +30,7 @@ class IndexStats:
     removed: int = 0
     empty: int = 0
     failed: int = 0
+    skipped: int = 0  # Wort-/Datenlisten u. Ä., bewusst nicht indexiert
     chunks: int = 0
     embedded: int = 0
     errors: list[tuple[str, str]] = field(default_factory=list)
@@ -53,7 +55,7 @@ def fts_body(path: Path, chunk: Chunk) -> str:
 
 OCR_TRIED = "kein Text, auch nicht per OCR"
 # Erhöhen, wenn Parser Dateien lesen können, an denen sie vorher scheiterten → einmaliger Neuversuch
-PARSER_VERSION = 2
+PARSER_VERSION = 3  # 3: UTF-16-Textdateien, Wort-/Datenlisten werden übersprungen
 
 
 def index_file(
@@ -68,6 +70,8 @@ def index_file(
             status = "empty"
             # merken, dass OCR schon versucht wurde → beim nächsten Lauf nicht erneut
             error = OCR_TRIED if ocr is not None and info.filetype == "pdf" else None
+    except SkippedFile as exc:
+        status, error = "skipped", str(exc)
     except ParseError as exc:
         status, error = "error", str(exc)
     except Exception as exc:  # kaputte Dateien dürfen den Lauf nie abbrechen
@@ -87,6 +91,16 @@ def index_file(
         ],
     )
     return status, len(chunks), error
+
+
+def _now_skipped_txt(path: Path, filetype: str) -> bool:
+    """Bereits indexierte .txt, die nach neuer Regel als Wort-/Datenliste gilt → einmal neu einlesen."""
+    if filetype != "txt":
+        return False
+    try:
+        return data_file_reason(read_text(path)) is not None
+    except ParseError:
+        return False
 
 
 def index_paths(
@@ -126,7 +140,14 @@ def index_paths(
             and existing.status == "empty"
             and existing.filetype == "pdf"
             and existing.error != OCR_TRIED
-        ) or (parsers_improved and existing is not None and existing.status in ("error", "empty"))
+        ) or (
+            parsers_improved
+            and existing is not None
+            and (
+                existing.status in ("error", "empty", "skipped")
+                or _now_skipped_txt(info.path, existing.filetype)
+            )
+        )
 
         if existing and not retry_ocr and existing.mtime == info.mtime and existing.size == info.size:
             stats.unchanged += 1
@@ -147,6 +168,8 @@ def index_paths(
             stats.errors.append((path, error or ""))
         elif status == "empty":
             stats.empty += 1
+        elif status == "skipped":
+            stats.skipped += 1
         if existing:
             stats.updated += 1
         else:

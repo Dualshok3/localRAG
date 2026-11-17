@@ -223,10 +223,10 @@ gemischte Fragen zu weiteren Dokumenten (Zeugnisse, Bordkarte, E-Mails, Lernskri
 | Vektor | 0.75 / 0.92 | 0.42 / 0.67 | 0.74 / 0.93 | 0.69 / 0.88 | 54 ms |
 | Hybrid, beide Listen gleich (vorher) | 0.79 / 0.96 | 0.25 / 0.42 | 0.71 / 0.90 | 0.67 / 0.85 | 54 ms |
 | **Hybrid, gewichtet (Standard)** | 0.79 / **1.00** | 0.33 / **0.67** | 0.76 / 0.95 | **0.71 / 0.92** | 53 ms |
-| Hybrid gewichtet + Reranker (`--rerank`) | **0.83 / 1.00** | **0.42** / 0.58 | **0.81 / 0.98** | **0.76 / 0.92** | 386 ms |
+| Hybrid gewichtet + Reranker (`--rerank`) | **0.88 / 1.00** | 0.25 / 0.58 | **0.83 / 0.98** | **0.76 / 0.92** | 388 ms |
 
 Werte: Recall@1 / Recall@5. MRR über alle 78: Vektor 0.76, Hybrid vorher 0.75, gewichtet 0.79, mit
-Reranker 0.84.
+Reranker 0.83.
 
 **Gewichtung nach Art der Anfrage.** Bei ganzen Sätzen findet BM25 viele Zufallstreffer über
 Allerweltswörter und schiebt den richtigen Vektortreffer nach unten. Deshalb zählt die BM25-Liste bei
@@ -236,10 +236,11 @@ Zeit und schlägt beide Einzelverfahren. Getestet wurden auch feste Gewichte 0.5
 Anfragen: Sie verlieren Kennungen wie Buchungs- und Auftragsnummern, die nur BM25 findet.
 
 **Reranker.** [bge-reranker-v2-m3](https://huggingface.co/BAAI/bge-reranker-v2-m3) liest die 40 besten
-Abschnitte zusammen mit der Frage. Seine Reihenfolge wird mit der der ersten Stufe gemischt statt sie zu
-ersetzen. Reines Ersetzen ergab bei den schweren Fragen Recall@1 0.25 statt 0.42, weil richtige Treffer
-von Platz 1 verdrängt wurden. Der Reranker bringt vor allem Platz 1 (0.71 → 0.76), kostet aber gut 0,3 s
-pro Suche und bleibt deshalb optional.
+Abschnitte zusammen mit der Frage und sortiert sie neu. Er bringt vor allem Platz 1 (0.71 → 0.76), kostet
+aber gut 0,3 s pro Suche und bleibt deshalb optional. Getestet wurde auch, seine Reihenfolge mit der
+der ersten Stufe zu mischen statt sie zu ersetzen. Auf diesen 78 Fragen war das gleichauf (MRR 0.84 statt
+0.83), über ganze Laufwerke aber schlechter (Recall@1 0.69 statt 0.73). Deshalb bleibt Ersetzen der
+Standard.
 
 Was keine Variante findet: zwei kurze E-Mails, deren Text fast nur aus Platzhaltern besteht und deren
 Thema in einer Abkürzung steckt („SF-Klasse“ für Schadenfreiheitsrabatt). Außerdem die
@@ -248,6 +249,42 @@ Rechnung, die fast nur aus Großbuchstaben-Kürzeln besteht.
 Einschränkung: Im synthetischen Korpus oben ändert die Gewichtung nichts (Hybrid Recall@1 bleibt 0.83).
 Dort hat BM25 falsche Dateien oft auf Platz 1, die gleichzeitig auf Vektor-Platz 2 liegen. Das reicht in
 RRF auch mit Gewicht 0.3 noch für den ersten Platz.
+
+### Ganze Laufwerke
+
+Zum Schluss alles, was es gibt: C: und D: komplett, ohne System- und Programmordner. Dazu kommen
+Code-Projekte, Spiele, Modell-Downloads und Werkzeug-Ordner, also viel Inhalt, der mit den gesuchten
+Dokumenten konkurriert.
+
+| | Benutzerordner | ganze Laufwerke |
+|---|---|---|
+| Dateien gescannt | 334 | 8.771 |
+| davon indexiert / Wortlisten übersprungen / Fehler | 313 / – / 21¹ | 8.372 / 375 / 13 |
+| Abschnitte | 6.808 | 57.498 |
+| Erster Lauf inkl. Vektoren | 2,3 min | 30 min |
+| Zweiter Lauf, nichts geändert | 0,2 s | 1:49 min (Scan von 2 Laufwerken) |
+| Hybrid-Suche über den Dienst, p50 | 56 ms | 53 ms |
+| Hybrid Recall@1 / @5 (78 Fragen) | 0.71 / 0.92 | 0.67 / 0.83 |
+| mit Reranker | 0.76 / 0.92 | 0.73 / 0.86 |
+
+¹ Vor den Verbesserungen unten gemessen. Die meisten dieser Fehler waren UTF-16-Dateien.
+
+Was der große Lauf aufgedeckt hat, und was daraus wurde:
+
+| Befund | Lösung |
+|---|---|
+| Der Scanner folgte Windows-Junctions wie „Dokumente und Einstellungen“ → `C:\Users` | Junctions und Symlinks werden übersprungen |
+| 79 „Binärdateien“ waren UTF-16-Text, wie viele Windows-Programme ihn schreiben | UTF-16 mit und ohne BOM wird erkannt |
+| Wörterbücher, Tokenizer-Vokabular und Übersetzungstabellen (zusammen über 16.000 Abschnitte) verdrängten echte Treffer | .txt mit Hunderten Zeilen à 1–3 Wörtern und fast ohne Sätze, oder mit einer Zeile über 50.000 Zeichen, gilt als Wort-/Datenliste und wird übersprungen. Bestehende Indizes räumen das beim nächsten Lauf einmal auf |
+| Vektorsuche dauerte 309 statt 54 ms, weil sqlite-vec jeden Vektor einzeln vergleicht | Dienst und MCP-Server halten die Vektoren als Matrix im Arbeitsspeicher (230 MB). Eine Versionsnummer in der Datenbank sorgt fürs Neuladen nach Änderungen |
+| Das Laden dieser Matrix dauerte 48 s, weil sqlite-vec Vektor für Vektor liefert | Direkt die Blöcke lesen, in denen sqlite-vec je 1.024 Vektoren speichert: 1,7 s, gegen den langsamen Weg geprüft, mit automatischem Rückfall |
+| Tausende MuPDF-Meldungen zu kaputten PDFs im Log | Meldungen abgeschaltet, echte Fehler kommen weiter als Fehler |
+
+Der verbleibende Abstand bei der Trefferquote kommt vor allem von echten Kopien. Dieselben Angaben zum
+Werdegang stehen auch in Dutzenden Textentwürfen in den Code-Projekten. Bei einer Frage nach einem Datum
+landen diese verwandten Texte vor dem Originaldokument, das als einziges das Datum enthält. Das ist kein Fehler des Index,
+zeigt aber, dass die Frage, welche Ordner man indexiert, die Qualität mehr beeinflusst als jede
+Feinabstimmung.
 
 ## Architektur
 
@@ -267,7 +304,7 @@ flowchart LR
 | Stichwortindex | FTS5 mit BM25, Text vorab per Snowball auf Wortstämme reduziert | [text_norm.py](src/localrag/index/text_norm.py) |
 | Vektorindex | bge-m3 (1024 Dim., fp16 auf CUDA), normalisiert in sqlite-vec | [vector_store.py](src/localrag/index/vector_store.py) |
 | Fusion | Reciprocal Rank Fusion (k = 60), BM25-Liste bei ganzen Sätzen 0.3-fach gewichtet | [hybrid.py](src/localrag/retrieval/hybrid.py) |
-| Reranking (optional) | bge-reranker-v2-m3 liest Frage + Abschnitt gemeinsam, Rang wird mit der ersten Stufe gemischt | [reranker.py](src/localrag/retrieval/reranker.py) |
+| Reranking (optional) | bge-reranker-v2-m3 liest Frage + Abschnitt gemeinsam und sortiert die Top 40 neu | [reranker.py](src/localrag/retrieval/reranker.py) |
 | Antwort | Prompt nur mit Quellen, Zitatpflicht, Schutz vor Anweisungen in Dokumenten | [prompts.py](src/localrag/generation/prompts.py) |
 
 ## Geplant

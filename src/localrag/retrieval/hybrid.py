@@ -25,7 +25,9 @@ from localrag.retrieval.reranker import Reranker
 Mode = Literal["auto", "keyword", "semantic", "hybrid"]
 RRF_K = 60
 RERANK_DEPTH = 40  # so viele Abschnitte der ersten Stufe liest der Reranker
-RERANK_BLEND = 1.0  # Reranker- und Erststufen-Rang gleich gewichtet mischen (besser als ersetzen)
+# Reranker-Reihenfolge übernehmen. Mischen mit der ersten Stufe (z. B. 1.0) war auf 78 Fragen im kleinen
+# Index gleichauf, im Index über ganze Laufwerke schlechter (Recall@1 0.69 statt 0.73).
+RERANK_BLEND: float | None = None
 SENTENCE_KEYWORD_WEIGHT = 0.3  # Gewicht der BM25-Liste bei Fragen in ganzen Sätzen (gemessen: 0.3 > 0.5)
 SHORT_QUERY_WORDS = 3
 _CODE_LIKE = re.compile(r"\d|[A-ZÄÖÜ]{2,}|[_.]\w")  # Ziffern, Abkürzungen, Dateinamen/Kennungen

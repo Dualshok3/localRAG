@@ -8,6 +8,10 @@ import pymupdf
 
 from .base import ParseError, Section
 
+# MuPDF schreibt Reparaturhinweise kaputter PDFs direkt auf stderr („syntax error: invalid key in dict“).
+# Beim Indexieren tausender Dateien überflutet das die Ausgabe; echte Fehler kommen weiter als Ausnahme.
+pymupdf.TOOLS.mupdf_display_errors(False)
+
 if TYPE_CHECKING:
     from localrag.ingest.ocr import OcrEngine
 

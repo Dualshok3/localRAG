@@ -279,7 +279,7 @@ RAG/
 - [ ] Metriken: **Recall@5, Recall@10, MRR**, Latenz p50/p95; für Antworten: Faithfulness (LLM-as-Judge)
 - [ ] Experimente, jeweils mit Zahlen im README:
   1. nur Vektor vs. nur BM25 vs. **Hybrid (RRF)**
-  2. ohne vs. **mit Reranker** ✅ *(echte Dateien, 78 Fragen: Recall@1 0,71 → 0,76, MRR 0,79 → 0,84, +0,33 s pro Suche → optional per `--rerank`. Rang mischen statt ersetzen: ersetzen verdrängte bei schweren Fragen richtige Platz-1-Treffer)*
+  2. ohne vs. **mit Reranker** ✅ *(echte Dateien, 78 Fragen: Recall@1 0,71 → 0,76, MRR 0,79 → 0,84, +0,33 s pro Suche → optional per `--rerank`. Mischen mit der ersten Stufe getestet: kleiner Index gleichauf, ganze Laufwerke schlechter → Ersetzen bleibt)*
   6. **Gewichtetes RRF** ✅ *(BM25-Liste bei ganzen Sätzen 0,3-fach, bei Kennungen/Stichworten voll: Recall@5 0,85 → 0,92 über 78 echte Fragen, ohne Zusatzkosten; im synthetischen Korpus wirkungslos)*
   3. Chunkgrößen 256 / 512 / 1024
   4. mit vs. ohne `heading_path`-Kontext
@@ -292,6 +292,7 @@ RAG/
 
 ### Phase 4 – Alltagstauglich (1–2 Wochen)
 - [x] Inkrementelle Indexierung (Manifest mit Hash/mtime), gelöschte Dateien entfernen
+- [x] Test über ganze Laufwerke (8.771 Dateien, 57.498 Abschnitte) *(behoben: Junctions, UTF-16, Wort-/Datenlisten, Vektoren im Arbeitsspeicher für Dienst/MCP, schnelles Laden aus sqlite-vec-Blöcken)*
 - [ ] watchdog-Watcher als Hintergrunddienst
 - [ ] Weitere Formate: XLSX, PPTX, HTML, E-Mails (.eml/.msg), Quellcode
 - [x] OCR für gescannte PDFs *(Windows-OCR, Drehungserkennung, früher leere PDFs werden einmal nachgeholt)*

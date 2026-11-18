@@ -96,3 +96,14 @@ def test_snippet_centers_on_match():
     snippet, matched = make_snippet(text, ["kundigungsfrist"], width=120)
     assert "Kündigungsfrist" in snippet and snippet.startswith("…") and snippet.endswith("…")
     assert matched == ("Kündigungsfrist",)
+
+
+def test_indexing_leaves_no_open_write_transaction(db: Database, corpus: Path):
+    """Offene Transaktion = Schreibsperre: im Dienst blockierte das sonst Watcher und Uploads."""
+    from localrag.index.embedder import HashingEmbedder
+
+    index_paths(db, [corpus])
+    assert not db.conn.in_transaction
+    index_paths(db, [corpus], embedder=HashingEmbedder())  # nichts Neues einzubetten
+    index_paths(db, [corpus], embedder=HashingEmbedder())
+    assert not db.conn.in_transaction

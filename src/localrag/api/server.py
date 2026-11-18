@@ -9,6 +9,8 @@ Endpunkte
 - POST /ask                        Antwort als NDJSON-Stream: sources → token… → done
 - GET  /file/{document_id}         indexierte Datei ausliefern (PDF im Browser an Seite #page=N)
 - POST /open                       indexierte Datei mit dem Standardprogramm öffnen bzw. im Explorer zeigen
+- POST /index                      Dateien/Ordner sofort indexieren (für „Senden an“ und `localrag add`)
+- POST /upload                     Datei in den Eingangsordner legen und sofort indexieren (Drag & Drop)
 
 Achtung: Der Dienst gibt Inhalte deiner Dateien heraus. Er bindet deshalb standardmäßig nur an
 127.0.0.1 und sollte nie an 0.0.0.0 oder ins Netz freigegeben werden.
@@ -33,6 +35,7 @@ from pathlib import Path
 from typing import Annotated, Any, Literal
 
 from fastapi import FastAPI, Header, HTTPException, Query, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -42,6 +45,8 @@ from localrag.generation.llm import ChatClient, LLMError
 from localrag.index.db import Database
 from localrag.index.embedder import Embedder, load_embedder, semantic_available
 from localrag.index.vector_store import EmbeddingModelMismatchError, VectorStore
+from localrag.ingest.indexer import index_paths
+from localrag.ingest.parsers import SUPPORTED_EXTENSIONS
 from localrag.retrieval.hybrid import search
 from localrag.retrieval.keyword import SearchHit
 from localrag.retrieval.reranker import Reranker
@@ -53,6 +58,34 @@ ENV_SERVER = "LOCALRAG_SERVER"
 ModeParam = Literal["auto", "keyword", "semantic", "hybrid"]
 LOCAL_HOSTS = ("127.0.0.1", "localhost", "::1")
 UI_HEADER = "X-LocalRAG"
+
+
+class IndexRequest(BaseModel):
+    paths: list[str] = Field(min_length=1, max_length=500)
+
+
+def safe_filename(name: str) -> str:
+    """Nur der Dateiname ohne Pfadanteile und Steuerzeichen – ein Upload darf nirgendwo sonst landen."""
+    from urllib.parse import unquote
+
+    base = os.path.basename(unquote(name).replace("\\", "/")).strip()
+    base = "".join(ch for ch in base if ch.isprintable() and ch not in '<>:"/\\|?*')
+    if not base or base.startswith(".") or base in ("..",):
+        raise HTTPException(400, "Ungültiger Dateiname")
+    return base[:200]
+
+
+def unique_target(folder: Path, name: str, data: bytes) -> Path:
+    """Gleicher Name + gleicher Inhalt → dieselbe Datei; gleicher Name, anderer Inhalt → „Name (2).pdf“."""
+    target = folder / name
+    stem, suffix = os.path.splitext(name)
+    n = 2
+    while target.exists():
+        if target.read_bytes() == data:
+            return target
+        target = folder / f"{stem} ({n}){suffix}"
+        n += 1
+    return target
 
 
 class OpenRequest(BaseModel):
@@ -117,6 +150,10 @@ def create_app(
     reranker: Reranker | None = None,
     allowed_hosts: Iterable[str] = LOCAL_HOSTS,
     opener: Callable[..., None] = open_with_system,
+    inbox: Path | None = None,
+    extensions: Iterable[str] = SUPPORTED_EXTENSIONS,
+    exclusions: Iterable[str] | None = None,
+    max_file_mb: float = 50,
 ) -> FastAPI:
     db_path = Path(db_path).resolve()
     hosts = {h.strip("[]").lower() for h in allowed_hosts}
@@ -180,6 +217,90 @@ def create_app(
         opener(path, reveal=req.reveal)
         return {"opened": str(path), "reveal": req.reveal}
 
+    exts = frozenset(e.lower() for e in extensions)
+
+    def require_ui_header(value: str | None) -> None:
+        # Fremde Webseiten können diesen Header ohne CORS-Freigabe nicht senden (und die gibt es nicht)
+        if value != "1":
+            raise HTTPException(403, f"Header {UI_HEADER} fehlt")
+
+    def index_now(paths: list[Path]) -> dict[str, Any]:
+        """Sofort indexieren – mit dem geladenen Modell, gesperrt gegen gleichzeitige Suche und Watcher."""
+        started = time.perf_counter()
+        kwargs: dict[str, Any] = {"extensions": exts, "max_file_mb": max_file_mb}
+        if exclusions is not None:
+            kwargs["excluded_dirs"] = list(exclusions)
+        with model_lock:
+            db = connection()
+            stats = index_paths(db, paths, embedder=embedder, **kwargs)
+            docs = []
+            for p in paths:
+                prefix = str(p.resolve())
+                rows = db.conn.execute(
+                    "SELECT id, path, status, error, chunk_count FROM documents "
+                    "WHERE path = ? OR path LIKE ? ESCAPE '!' ORDER BY path LIMIT 50",
+                    (
+                        prefix,
+                        prefix.replace("!", "!!").replace("%", "!%").replace("_", "!_").rstrip("\\/")
+                        + os.sep
+                        + "%",
+                    ),
+                ).fetchall()
+                docs += [dict(r) for r in rows]
+        return {
+            "seconds": round(time.perf_counter() - started, 2),
+            "scanned": stats.scanned,
+            "added": stats.added,
+            "updated": stats.updated,
+            "unchanged": stats.unchanged,
+            "removed": stats.removed,
+            "failed": stats.failed,
+            "skipped": stats.skipped,
+            "empty": stats.empty,
+            "chunks": stats.chunks,
+            "documents": docs[:50],
+        }
+
+    @app.post("/index")
+    def index_endpoint(
+        req: IndexRequest, x_localrag: Annotated[str | None, Header(alias=UI_HEADER)] = None
+    ) -> dict[str, Any]:
+        require_ui_header(x_localrag)
+        paths = [Path(p) for p in req.paths]
+        missing = [str(p) for p in paths if not p.exists()]
+        if missing:
+            raise HTTPException(404, "Nicht gefunden: " + ", ".join(missing[:5]))
+        return index_now(paths)
+
+    @app.post("/upload")
+    async def upload_endpoint(
+        request: Request,
+        x_localrag: Annotated[str | None, Header(alias=UI_HEADER)] = None,
+        x_filename: Annotated[str | None, Header(alias="X-Filename")] = None,
+    ) -> dict[str, Any]:
+        require_ui_header(x_localrag)
+        if inbox is None:
+            raise HTTPException(503, "Kein Eingangsordner konfiguriert")
+        name = safe_filename(x_filename or "")
+        if os.path.splitext(name)[1].lower() not in exts:
+            raise HTTPException(
+                415, f"Dateityp {os.path.splitext(name)[1] or '(ohne Endung)'} wird nicht unterstützt"
+            )
+        limit = int(max_file_mb * 1024 * 1024)
+        if int(request.headers.get("content-length") or 0) > limit:
+            raise HTTPException(413, f"Datei größer als {max_file_mb:g} MB")
+        data = await request.body()
+        if not data:
+            raise HTTPException(400, "Leere Datei")
+        if len(data) > limit:
+            raise HTTPException(413, f"Datei größer als {max_file_mb:g} MB")
+        inbox.mkdir(parents=True, exist_ok=True)
+        target = unique_target(inbox, name, data)
+        if not target.exists():
+            target.write_bytes(data)
+        result = await run_in_threadpool(index_now, [target])
+        return {"saved": str(target), **result}
+
     @app.get("/stats")
     def stats_endpoint() -> dict[str, Any]:
         st = connection().stats()
@@ -204,6 +325,8 @@ def create_app(
             "embedding_model": embedder.name if embedder else None,
             "reranker": reranker.name if reranker else None,
             "watching": [str(r) for r in app.state.watcher.roots] if app.state.watcher else None,
+            "inbox": str(inbox) if inbox else None,
+            "extensions": sorted(exts),
         }
 
     @app.get("/search")

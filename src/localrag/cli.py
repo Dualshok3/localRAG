@@ -110,11 +110,16 @@ def serve(
         console.print(f"[red]Kein Index unter {db}[/red] – zuerst `localrag index <ordner>` ausführen.")
         raise typer.Exit(1)
     with console.status("Lade Embedding-Modell…"):
+        cfg = _config_or_exit()
         application = create_app(
             db,
             load_model=not no_model,
             reranker=_load_reranker(rerank),
             allowed_hosts=(*LOCAL_HOSTS, host),
+            inbox=cfg.inbox,
+            extensions=cfg.extensions(),
+            exclusions=cfg.exclusions(),
+            max_file_mb=cfg.max_file_mb,
         )
     model = application.state.embedder.name if application.state.embedder else "keins (nur BM25)"
     if application.state.reranker:
@@ -721,6 +726,149 @@ def _config_or_exit() -> Config:
 
 
 AUTOSTART_NAME = "LocalRAG.vbs"
+SENDTO_NAME = "LocalRAG (indexieren).vbs"
+
+
+def _popup(text: str, error: bool = False) -> None:
+    """Kurze Meldung als Windows-Dialog – für „Senden an“, wo es kein Konsolenfenster gibt."""
+    if sys.platform != "win32":
+        typer.echo(text)
+        return
+    import ctypes
+
+    flags = 0x10 if error else 0x40  # MB_ICONERROR / MB_ICONINFORMATION
+    ctypes.windll.user32.MessageBoxW(0, text, "LocalRAG", flags | 0x40000)  # MB_TOPMOST
+
+
+def _add_summary(result: dict) -> str:
+    parts = [
+        f"{result[k]} {label}"
+        for k, label in (
+            ("added", "neu"),
+            ("updated", "aktualisiert"),
+            ("unchanged", "unverändert"),
+            ("skipped", "übersprungen"),
+            ("empty", "ohne Text"),
+            ("failed", "Fehler"),
+        )
+        if result.get(k)
+    ]
+    lines = [f"{result.get('scanned', 0)} Dateien geprüft: " + (", ".join(parts) or "nichts zu tun")]
+    for doc in result.get("documents", [])[:8]:
+        mark = {"ok": "✓", "error": "✗", "skipped": "–", "empty": "○"}.get(doc["status"], "?")
+        extra = f" ({doc['error']})" if doc.get("error") else ""
+        lines.append(f"{mark} {Path(doc['path']).name}{extra}")
+    if len(result.get("documents", [])) > 8:
+        lines.append(f"… und {len(result['documents']) - 8} weitere")
+    return "\n".join(lines)
+
+
+@app.command()
+def add(
+    paths: Annotated[list[Path], typer.Argument(help="Dateien oder Ordner.")],
+    db: DbOption,
+    popup: Annotated[
+        bool, typer.Option("--popup", help="Ergebnis als Windows-Dialog (für „Senden an“).")
+    ] = False,
+) -> None:
+    """Indexiert Dateien oder Ordner sofort – auch außerhalb der beobachteten Ordner.
+
+    Läuft der Dienst, rechnet er mit seinem geladenen Modell (schnell, kein zweites Modell im Grafikspeicher).
+    """
+    import os
+
+    missing = [str(p) for p in paths if not p.exists()]
+    if missing:
+        msg = "Nicht gefunden: " + ", ".join(missing)
+        _popup(msg, error=True) if popup else console.print(f"[red]{msg}[/red]")
+        raise typer.Exit(1)
+    service = _service_for(db)
+    try:
+        if service is not None:
+            with service:
+                result = service.index([str(p.resolve()) for p in paths])
+        else:
+            cfg = _config_or_exit()
+            embedder = None
+            with Database(db) as database:
+                store = VectorStore(database)
+                if store.available and store.model:
+                    embedder = _load_embedder_for_search(database, "auto")
+                stats = index_paths(
+                    database,
+                    paths,
+                    embedder=embedder,
+                    extensions=cfg.extensions(),
+                    excluded_dirs=cfg.exclusions(),
+                    max_file_mb=cfg.max_file_mb,
+                )
+                docs = []
+                for p in paths:
+                    root = str(p.resolve())
+                    docs += [
+                        dict(r)
+                        for r in database.conn.execute(
+                            "SELECT id, path, status, error FROM documents "
+                            "WHERE path = ? OR path LIKE ? LIMIT 50",
+                            (root, root.rstrip("\\/") + os.sep + "%"),
+                        )
+                    ]
+            result = {**{k: getattr(stats, k) for k in (
+                "scanned", "added", "updated", "unchanged", "removed", "failed", "skipped", "empty"
+            )}, "documents": docs}  # fmt: skip
+    except (RuntimeError, EmbeddingModelMismatchError) as exc:
+        _popup(str(exc), error=True) if popup else console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    summary = _add_summary(result)
+    if popup:
+        _popup(summary, error=bool(result.get("failed")))
+    else:
+        console.print(summary, markup=False, highlight=False)
+
+
+def sendto_script(python: str, env: dict[str, str]) -> str:
+    """VBScript fürs „Senden an“-Menü: übergibt die markierten Dateien an `localrag add --popup`."""
+
+    def q(text: str) -> str:
+        return text.replace('"', '""')
+
+    lines = ['Set sh = CreateObject("WScript.Shell")']
+    lines += [f'sh.Environment("Process")("{q(k)}") = "{q(v)}"' for k, v in sorted(env.items())]
+    lines += [
+        f'cmd = """{q(python)}"" -m localrag.cli add --popup"',
+        "For Each a In WScript.Arguments",
+        '  cmd = cmd & " """ & a & """"',
+        "Next",
+        "sh.Run cmd, 0, False",
+    ]
+    return "\r\n".join(lines) + "\r\n"
+
+
+@app.command()
+def sendto(
+    enable: Annotated[
+        bool | None,
+        typer.Option("--enable/--disable", help="Eintrag im Explorer-Menü „Senden an“ anlegen/entfernen."),
+    ] = None,
+) -> None:
+    """Rechtsklick → „Senden an“ → „LocalRAG (indexieren)“: markierte Dateien sofort in den Index."""
+    import os
+
+    if sys.platform != "win32":
+        console.print("[red]Nur unter Windows.[/red]")
+        raise typer.Exit(1)
+    target = Path(os.environ["APPDATA"]) / "Microsoft" / "Windows" / "SendTo" / SENDTO_NAME
+    if enable is None:
+        console.print(f"„Senden an“ ist [bold]{'an' if target.exists() else 'aus'}[/bold] ({target})")
+        return
+    if not enable:
+        target.unlink(missing_ok=True)
+        console.print("[green]Eintrag entfernt.[/green]")
+        return
+    env = {k: v for k in ("LOCALRAG_MODELS", "LOCALRAG_CONFIG", "LOCALRAG_DB") if (v := os.environ.get(k))}
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(sendto_script(sys.executable, env), encoding="utf-16")
+    console.print(f"[green]Eintrag angelegt:[/green] Rechtsklick → Senden an → {target.stem}")
 
 
 def autostart_script(python: str, log: Path, env: dict[str, str]) -> str:

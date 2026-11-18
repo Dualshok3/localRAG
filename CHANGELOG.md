@@ -10,6 +10,12 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen 
 - Sprachmodell in der Konfiguration: `llm_url` und `llm_model` (Umgebungsvariablen haben Vorrang).
 - Quellcode als Format, nur mit `code = true`, aufgeteilt an Funktionen und Klassen.
 - Messung der Antwortqualität (`eval/run_answer_eval.py`) mit Prüfmodell, Zitat-Prüfung und Fallen-Fragen.
+- Dateien sofort aufnehmen: `localrag add`, Explorer-Eintrag „Senden an → LocalRAG“ (`localrag sendto --enable`)
+  und Ziehen & Ablegen in der Web-Oberfläche (Eingangsordner `inbox`). Neue API-Endpunkte `/index` und `/upload`.
+
+### Behoben
+- Ein Indexlauf ohne neue Vektoren ließ eine Schreibtransaktion offen. Im Dienst blockierte das Watcher und
+  weitere Uploads bis zur Zeitüberschreitung.
 
 ### Geändert
 - Von Werkzeugen erzeugte HTML-Dokumentation (Sphinx, Doxygen, Javadoc …) wird übersprungen, `steamapps` ist

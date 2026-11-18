@@ -75,6 +75,9 @@ code = false
 # Größere Dateien überspringen (MB)
 max_file_mb = 50
 
+# Eingangsordner für Dateien, die in der Web-Oberfläche abgelegt werden
+# inbox = "C:/Users/ich/Documents/LocalRAG-Eingang"
+
 # Sprachmodell für `localrag ask` (OpenAI-kompatibel; Standard: LM Studio auf Port 1234)
 # llm_url = "http://127.0.0.1:1234/v1"
 # llm_model = "gemma-4-26b-a4b-it"
@@ -98,6 +101,7 @@ class Config:
     code: bool = False  # Quellcode (.py, .js, …) mitindexieren
     llm_url: str | None = None  # OpenAI-kompatibler Server für `ask`
     llm_model: str | None = None
+    inbox: Path = field(default_factory=lambda: Path.home() / "Documents" / "LocalRAG-Eingang")
     source: Path | None = field(default=None, compare=False)
 
     def extensions(self) -> frozenset[str]:
@@ -127,7 +131,17 @@ def load_config(path: Path | None = None) -> Config:
     except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError) as exc:
         raise ConfigError(f"Konfiguration {path} nicht lesbar: {exc}") from exc
 
-    known = {"folders", "exclude", "default_excludes", "max_file_mb", "db", "code", "llm_url", "llm_model"}
+    known = {
+        "folders",
+        "exclude",
+        "default_excludes",
+        "max_file_mb",
+        "db",
+        "code",
+        "llm_url",
+        "llm_model",
+        "inbox",
+    }
     unknown = set(data) - known
     if unknown:
         raise ConfigError(f"Unbekannte Einträge in {path}: {', '.join(sorted(unknown))}")
@@ -144,7 +158,7 @@ def load_config(path: Path | None = None) -> Config:
     db = data.get("db")
     if db is not None and not isinstance(db, str):
         raise ConfigError(f"db in {path} muss ein Pfad (Text) sein")
-    for key in ("llm_url", "llm_model"):
+    for key in ("llm_url", "llm_model", "inbox"):
         if data.get(key) is not None and not isinstance(data[key], str):
             raise ConfigError(f"{key} in {path} muss ein Text sein")
     return Config(
@@ -156,6 +170,7 @@ def load_config(path: Path | None = None) -> Config:
         code=bool(data.get("code", False)),
         llm_url=data.get("llm_url"),
         llm_model=data.get("llm_model"),
+        **({"inbox": Path(data["inbox"]).expanduser()} if data.get("inbox") else {}),
         source=path,
     )
 

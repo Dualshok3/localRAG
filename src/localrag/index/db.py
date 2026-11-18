@@ -131,6 +131,8 @@ class Database:
         return row is not None
 
     def close(self) -> None:
+        if self.conn.in_transaction:  # nichts stillschweigend verwerfen
+            self.conn.commit()
         self.conn.close()
 
     def __enter__(self) -> Database:

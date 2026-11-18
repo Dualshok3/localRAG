@@ -140,6 +140,21 @@ Log unter `~/.localrag/serve.log`). `--disable` nimmt das zurück.
 uv run localrag autostart --enable
 ```
 
+### Dateien sofort aufnehmen
+
+Was in den beobachteten Ordnern landet, ist nach etwa 2 s durchsuchbar. Für alles andere, etwa Dateien auf
+einem USB-Stick oder gerade im Browser geöffnete Dokumente, gibt es drei Wege:
+
+| Weg | So geht's |
+|---|---|
+| Explorer | Rechtsklick → *Senden an* → *LocalRAG (indexieren)*, einmalig einrichten mit `localrag sendto --enable`. Ein kurzer Dialog meldet das Ergebnis. |
+| Web-Oberfläche | Dateien auf die Seite ziehen oder *＋ Dateien* wählen. Sie werden in den Eingangsordner kopiert (`inbox` in der Konfiguration, Standard `Dokumente\LocalRAG-Eingang`) und sofort indexiert. |
+| Kommandozeile | `localrag add <datei-oder-ordner>` |
+
+Läuft der Dienst, rechnet er in allen drei Fällen mit seinem bereits geladenen Modell. Es kommt also kein
+zweites in den Grafikspeicher. Dateien außerhalb der beobachteten Ordner werden einmal aufgenommen, spätere
+Änderungen daran aber nicht automatisch nachgezogen.
+
 ### Web-Oberfläche
 
 `localrag serve` liefert unter http://127.0.0.1:8765 eine Oberfläche ohne externe Abhängigkeiten:
@@ -186,7 +201,7 @@ uv run localrag search "…"       # nutzt den Dienst automatisch → Antwort in
 uv run localrag search "…" --local   # Dienst ignorieren
 ```
 
-Der Dienst bietet auch eine HTTP-API (`/search`, `/ask`, `/health`, `/stats`, `/file`, `/open`, Doku unter
+Der Dienst bietet auch eine HTTP-API (`/search`, `/ask`, `/health`, `/stats`, `/file`, `/open`, `/index`, `/upload`, Doku unter
 `http://127.0.0.1:8765/docs`).
 Weil er Inhalte deiner Dateien herausgibt, bindet er standardmäßig nur an 127.0.0.1.
 

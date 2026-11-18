@@ -71,6 +71,28 @@
   .card .actions :is(button, a):hover { color: var(--accent); border-color: var(--accent); }
   .card .dups { margin: 6px 0 0 32px; color: var(--muted); font-size: 12px; }
   .empty { color: var(--muted); text-align: center; padding: 40px 0; }
+  #drop { position: fixed; inset: 0; background: color-mix(in srgb, var(--bg) 80%, transparent);
+          display: none; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
+  #drop.show { display: flex; }
+  #drop div { border: 3px dashed var(--accent); border-radius: 18px; padding: 48px 40px; text-align: center;
+              background: var(--panel); font-size: 18px; font-weight: 600; max-width: 520px; }
+  #drop small { display: block; margin-top: 8px; font-weight: 400; font-size: 13px; color: var(--muted); }
+  #uploads { margin-top: 18px; display: none; background: var(--panel); border: 1px solid var(--line);
+             border-radius: 12px; padding: 12px 16px; box-shadow: var(--shadow); }
+  #uploads .label { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+                    margin-bottom: 4px; display: flex; justify-content: space-between; }
+  #uploads .label button { min-height: 0; border: 0; padding: 0; background: none; color: var(--muted);
+                           font-size: 12px; }
+  .up { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; border-top: 1px solid var(--line);
+        flex-wrap: wrap; }
+  .up:first-of-type { border-top: 0; }
+  .up .state { width: 18px; text-align: center; }
+  .up .state.ok { color: var(--ok); } .up .state.err { color: var(--danger); }
+  .up .fname { font-weight: 600; overflow-wrap: anywhere; }
+  .up .info { color: var(--muted); font-size: 13px; }
+  .up button { min-height: 26px; font-size: 12px; padding: 2px 9px; border-radius: 7px; color: var(--muted);
+               background: transparent; }
+  .add-btn { min-height: 32px; font-size: 13px; padding: 0 10px; margin-left: auto; }
   footer { margin-top: 32px; color: var(--muted); font-size: 12px; text-align: center; }
   kbd { font: 11px ui-monospace, Consolas, monospace; border: 1px solid var(--line); border-radius: 4px;
         padding: 0 4px; }
@@ -110,13 +132,23 @@
     <button type="button" class="chip" data-insert="-in:">-in:Ordner</button>
     <button type="button" class="chip" data-insert="after:2024">after:2024</button>
     <button type="button" class="chip" data-insert="before:2024-07">before:2024-07</button>
+    <button type="button" class="add-btn" id="add-btn" title="Dateien in den Index aufnehmen – oder einfach auf die Seite ziehen">＋ Dateien</button>
+    <input type="file" id="file-input" multiple hidden>
   </div>
+
+  <section id="uploads" aria-live="polite">
+    <div class="label"><span>Hinzugefügt</span><button type="button" id="uploads-close">ausblenden</button></div>
+    <div id="upload-list"></div>
+  </section>
 
   <section id="answer" aria-live="polite"></section>
   <div id="meta"></div>
   <section id="results"></section>
 
-  <footer>Alles bleibt auf diesem Rechner. <kbd>/</kbd> Suchfeld · <kbd>Enter</kbd> suchen ·
+  <div id="drop"><div>Dateien hier ablegen<small id="drop-hint">Sie werden in den Eingangsordner kopiert
+    und sofort durchsuchbar.</small></div></div>
+
+  <footer>Alles bleibt auf diesem Rechner. Dateien zum Indexieren auf die Seite ziehen · <kbd>/</kbd> Suchfeld · <kbd>Enter</kbd> suchen ·
     <kbd>Strg</kbd>+<kbd>Enter</kbd> fragen</footer>
 </main>
 
@@ -323,10 +355,84 @@ for (const chip of document.querySelectorAll(".chip")) {
   });
 }
 
-(async function init() {
+// --- Dateien hinzufügen (Ziehen & Ablegen oder Auswahl) -------------------------------------
+let allowed = null;  // unterstützte Endungen laut Dienst
+const uploads = $("uploads"), uploadList = $("upload-list");
+
+function uploadRow(name) {
+  const state = el("span", { class: "state" }, "…");
+  const info = el("span", { class: "info" }, "wird indexiert");
+  const row = el("div", { class: "up" }, state, el("span", { class: "fname" }, name), info);
+  uploadList.prepend(row);
+  uploads.style.display = "block";
+  return { row, state, info };
+}
+
+async function uploadFile(file) {
+  const ui = uploadRow(file.name);
+  const ext = (file.name.match(/\.[^.]+$/) || [""])[0].toLowerCase();
+  if (allowed && !allowed.includes(ext)) {
+    ui.state.textContent = "✗"; ui.state.className = "state err";
+    ui.info.textContent = `Dateityp ${ext || "(ohne Endung)"} wird nicht unterstützt`;
+    return;
+  }
+  try {
+    const resp = await fetch("/upload", {
+      method: "POST",
+      headers: { "X-LocalRAG": "1", "X-Filename": encodeURIComponent(file.name),
+                 "Content-Type": "application/octet-stream" },
+      body: file,
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail || resp.statusText);
+    const doc = (data.documents || [])[0];
+    const status = doc ? doc.status : "ok";
+    const good = status === "ok";
+    ui.state.textContent = good ? "✓" : (status === "error" ? "✗" : "–");
+    ui.state.className = "state " + (good ? "ok" : "err");
+    const n = doc ? doc.chunk_count : data.chunks;
+    const what = data.unchanged ? "war schon im Index" : (good ? `${n} ${n === 1 ? "Abschnitt" : "Abschnitte"}` :
+                 (doc && doc.error) || (status === "empty" ? "kein Text gefunden" : status));
+    ui.info.textContent = `${what} · ${data.seconds} s`;
+    if (doc && good) {
+      ui.row.append(el("button", { type: "button", onclick: () => openFile(doc.id, false) }, "Öffnen"),
+                    el("button", { type: "button", onclick: () => openFile(doc.id, true) }, "Im Ordner zeigen"));
+    }
+  } catch (e) {
+    ui.state.textContent = "✗"; ui.state.className = "state err";
+    ui.info.textContent = e.message;
+  }
+}
+
+async function uploadAll(files) {
+  for (const f of files) await uploadFile(f);  // nacheinander: der Dienst rechnet ohnehin seriell
+  refreshStatus();
+}
+
+$("add-btn").addEventListener("click", () => $("file-input").click());
+$("file-input").addEventListener("change", (e) => { uploadAll([...e.target.files]); e.target.value = ""; });
+$("uploads-close").addEventListener("click", () => { uploads.style.display = "none"; uploadList.replaceChildren(); });
+
+const drop = $("drop");
+let dragDepth = 0;
+const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
+document.addEventListener("dragenter", (e) => { if (hasFiles(e)) { dragDepth++; drop.classList.add("show"); } });
+document.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; drop.classList.remove("show"); } });
+document.addEventListener("dragover", (e) => { if (hasFiles(e)) e.preventDefault(); });
+document.addEventListener("drop", (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  dragDepth = 0;
+  drop.classList.remove("show");
+  uploadAll([...e.dataTransfer.files]);
+});
+
+async function refreshStatus() {
   try {
     const [health, stats] = await Promise.all([fetch("/health").then(r => r.json()),
                                                fetch("/stats").then(r => r.json())]);
+    allowed = health.extensions || null;
+    if (health.inbox) $("drop-hint").textContent = `Sie werden nach ${health.inbox} kopiert und sofort durchsuchbar.`;
     const bits = [`${stats.documents.toLocaleString("de-DE")} Dateien`,
                   `${stats.chunks.toLocaleString("de-DE")} Abschnitte`,
                   health.embedding_model ? health.embedding_model.split("/").pop() : "nur Stichwortsuche"];
@@ -334,6 +440,10 @@ for (const chip of document.querySelectorAll(".chip")) {
     if (health.watching) bits.push("beobachtet " + health.watching.length + " Ordner");
     $("status").replaceChildren(el("span", { class: "dot" }), bits.join(" · "));
   } catch { $("status").textContent = "Dienst nicht erreichbar"; }
+}
+
+(async function init() {
+  await refreshStatus();
   const params = new URLSearchParams(location.search);
   if (params.get("q")) {
     q.value = params.get("q");

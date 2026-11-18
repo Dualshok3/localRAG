@@ -192,7 +192,10 @@ def index_paths(
         if not Path(path).exists() or rules.path_excluded(path, root if root.is_dir() else None):
             db.delete_document(path)
             stats.removed += 1
-    db.set_meta("parser_version", str(PARSER_VERSION))
+    # In einer eigenen Transaktion: sonst bliebe die Schreibsperre offen, bis irgendwer committet – im Dienst
+    # (Verbindung bleibt bestehen) blockierte das Watcher und Uploads, wenn nichts einzubetten war
+    with db.transaction():
+        db.set_meta("parser_version", str(PARSER_VERSION))
 
     if embedder is not None:
         store = VectorStore(db)

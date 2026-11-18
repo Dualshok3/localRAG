@@ -63,6 +63,13 @@ class ServiceClient:
         data = resp.json()
         return data["mode"], data["took_ms"], [hit_from_dict(h) for h in data["hits"]]
 
+    def index(self, paths: list[str]) -> dict[str, Any]:
+        """Dateien/Ordner sofort über den laufenden Dienst indexieren (nutzt dessen geladenes Modell)."""
+        resp = self._http.post(f"{self.url}/index", json={"paths": paths}, headers={"X-LocalRAG": "1"})
+        if resp.status_code >= 400:
+            raise RuntimeError(resp.json().get("detail", resp.text))
+        return resp.json()
+
     def ask(
         self,
         question: str,

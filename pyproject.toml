@@ -1,6 +1,6 @@
 [project]
 name = "localrag"
-version = "0.1.0"
+version = "0.2.0"
 description = "Lokale semantische Suche und RAG über die eigenen Dateien"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -16,6 +16,10 @@ dependencies = [
     "httpx>=0.27",
     "fastapi>=0.115",
     "uvicorn>=0.30",
+    "watchdog>=4.0",
+    "openpyxl>=3.1",
+    "python-pptx>=1.0",
+    "extract-msg>=0.48",
 ]
 
 [project.optional-dependencies]

@@ -46,6 +46,9 @@ def select_context(hits: list[SearchHit], max_chars: int = 12_000) -> list[Searc
 
 
 def build_messages(question: str, sources: list[SearchHit]) -> list[Message]:
+    from localrag.retrieval.filters import parse_query
+
+    question = parse_query(question)[0] or question  # Filter wie „in:Rechnungen“ gehören nicht zur Frage
     blocks = [f"[{i}] {source_label(h)}\n{h.text.strip()}" for i, h in enumerate(sources, start=1)]
     user = "Quellen:\n\n" + "\n\n---\n\n".join(blocks) + f"\n\nFrage: {question}"
     return [Message("system", SYSTEM_PROMPT), Message("user", user)]

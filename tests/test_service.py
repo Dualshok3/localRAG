@@ -13,6 +13,8 @@ from localrag.ingest.indexer import index_paths
 
 from .test_generation import FakeServer
 
+OPENED: list[tuple[Path, bool]] = []
+
 
 class Bridge(httpx.BaseTransport):
     """Leitet httpx-Anfragen an den FastAPI-TestClient weiter (ohne echten Netzwerk-Port)."""
@@ -40,7 +42,12 @@ def make_service(db_path: Path, llm: FakeServer | None = None, *, with_vectors: 
         return ChatClient("http://llm/v1", model or "m", transport=httpx.MockTransport(llm or FakeServer([])))
 
     app = create_app(
-        db_path, embedder=HashingEmbedder() if with_vectors else None, load_model=False, llm_factory=factory
+        db_path,
+        embedder=HashingEmbedder() if with_vectors else None,
+        load_model=False,
+        llm_factory=factory,
+        allowed_hosts=("testserver", "127.0.0.1"),
+        opener=lambda path, reveal=False: OPENED.append((path, reveal)),
     )
     test_client = TestClient(app)
     return test_client, ServiceClient("http://testserver", transport=Bridge(test_client))
@@ -111,8 +118,8 @@ def test_ask_reports_llm_errors_as_event(indexed: Path):
         load_model=False,
         llm_factory=lambda m: ChatClient("http://llm/v1", "m", transport=httpx.MockTransport(refuse)),
     )
-    test_client = TestClient(app)
-    svc = ServiceClient("http://testserver", transport=Bridge(test_client))
+    test_client = TestClient(app, base_url="http://127.0.0.1")
+    svc = ServiceClient("http://127.0.0.1", transport=Bridge(test_client))
     events = list(svc.ask("Kündigungsfrist"))
     assert events[-1]["type"] == "error" and "lms server start" in events[-1]["message"]
 
@@ -151,7 +158,50 @@ def test_service_uses_reranker_when_configured(tmp_path: Path):
             return [1.0 if "Thermostat" in t else 0.0 for t in texts]
 
     rr = Recording()
-    client = TestClient(create_app(db_path, load_model=False, reranker=rr))
+    client = TestClient(create_app(db_path, load_model=False, reranker=rr), base_url="http://127.0.0.1")
     assert client.get("/search", params={"q": "Reparatur"}).json()["hits"]
     assert any("Thermostat" in t for t in rr.seen)  # Suche lief durch den Reranker
     assert client.get("/health").json()["reranker"] == "fake-reranker"
+
+
+def test_web_ui_is_served(indexed: Path):
+    client, _ = make_service(indexed)
+    resp = client.get("/")
+    assert resp.status_code == 200 and "LocalRAG" in resp.text
+    assert ".innerHTML" not in resp.text  # Dateiinhalte nie als HTML einsetzen
+
+
+def test_stats_endpoint(indexed: Path):
+    client, _ = make_service(indexed)
+    data = client.get("/stats").json()
+    assert data["documents"] >= 4 and data["chunks"] > 0
+
+
+def test_foreign_host_header_is_rejected(indexed: Path):
+    """DNS-Rebinding: evil.example → 127.0.0.1 darf die Suche nicht wie die eigene Seite nutzen."""
+    client, _ = make_service(indexed)
+    assert client.get("/search", params={"q": "Urlaub"}, headers={"host": "evil.example"}).status_code == 403
+    assert client.get("/health", headers={"host": "127.0.0.1:8765"}).status_code == 200
+
+
+def test_file_serves_only_indexed_documents(indexed: Path):
+    client, _ = make_service(indexed)
+    hit = client.get("/search", params={"q": "Kündigungsfrist", "mode": "keyword"}).json()["hits"][0]
+    resp = client.get(f"/file/{hit['document_id']}")
+    assert resp.status_code == 200 and resp.content[:4] == b"%PDF"
+    assert client.get("/file/999999").status_code == 404
+
+
+def test_open_requires_ui_header_and_indexed_document(indexed: Path):
+    client, _ = make_service(indexed)
+    hit = client.get("/search", params={"q": "Urlaubstage", "mode": "keyword"}).json()["hits"][0]
+    OPENED.clear()
+    # ohne Header (z. B. Formular einer fremden Webseite) → abgelehnt
+    assert client.post("/open", json={"document_id": hit["document_id"]}).status_code == 403
+    assert OPENED == []
+    ok = client.post(
+        "/open", json={"document_id": hit["document_id"], "reveal": True}, headers={"X-LocalRAG": "1"}
+    )
+    assert ok.status_code == 200
+    assert [(Path(hit["path"]), True)] == OPENED
+    assert client.post("/open", json={"document_id": 999999}, headers={"X-LocalRAG": "1"}).status_code == 404

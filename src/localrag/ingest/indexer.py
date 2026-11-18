@@ -16,7 +16,7 @@ from localrag.ingest.chunker import Chunk, chunk_sections
 from localrag.ingest.ocr import OcrEngine
 from localrag.ingest.parsers import ParseError, SkippedFile, parse
 from localrag.ingest.parsers.text import data_file_reason, read_text
-from localrag.ingest.scanner import FileInfo, is_under, iter_files
+from localrag.ingest.scanner import Exclusions, FileInfo, is_under, iter_files
 
 ProgressCallback = Callable[[FileInfo, str], None]
 
@@ -123,7 +123,8 @@ def index_paths(
     roots = [Path(r).resolve() for r in roots]
     stats = IndexStats()
     seen: set[str] = set()
-    files = list(iter_files(roots, excluded_dirs=excluded_dirs, max_file_mb=max_file_mb))
+    rules = excluded_dirs if isinstance(excluded_dirs, Exclusions) else Exclusions(excluded_dirs)
+    files = list(iter_files(roots, excluded_dirs=rules, max_file_mb=max_file_mb))
     # Ältere Indizes kennen den Eintrag noch nicht → gelten als Version 1
     has_docs = db.conn.execute("SELECT 1 FROM documents LIMIT 1").fetchone() is not None
     stored_version = db.get_meta("parser_version") or ("1" if has_docs else None)
@@ -176,9 +177,14 @@ def index_paths(
             stats.added += 1
         _report(progress, info, status)
 
-    # Dateien, die im Index stehen, aber unter den gescannten Wurzeln nicht mehr existieren
+    # Dateien unter den gescannten Wurzeln, die gelöscht wurden oder jetzt ausgeschlossen sind
     for path in list(db.iter_document_paths()):
-        if path not in seen and any(is_under(path, r) for r in roots) and not Path(path).exists():
+        if path in seen:
+            continue
+        root = next((r for r in roots if is_under(path, r)), None)
+        if root is None:
+            continue
+        if not Path(path).exists() or rules.path_excluded(path, root if root.is_dir() else None):
             db.delete_document(path)
             stats.removed += 1
     db.set_meta("parser_version", str(PARSER_VERSION))

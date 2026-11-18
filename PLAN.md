@@ -113,12 +113,12 @@ Was es **besonders** macht (statt nur LangChain-Tutorial nachgebaut):
 ## 3. Anforderungen
 
 ### Funktional
-- [ ] Ordner konfigurieren (Include/Exclude, z. B. `node_modules`, `.git`, `AppData` ausschließen)
-- [ ] Dateitypen: `.pdf .docx .xlsx .pptx .txt .md .csv .html .eml/.msg`, Quellcode, optional Bilder (OCR)
-- [ ] Inkrementelles Update (neue/geänderte/gelöschte Dateien erkennen)
-- [ ] Suche: semantisch + Stichwort, Filter (Ordner, Dateityp, Datum)
-- [ ] Fragen beantworten mit **Zitaten** (Datei, Seite, Textausschnitt), Klick öffnet die Datei
-- [ ] CLI, Web-UI, später globaler Hotkey (z. B. `Alt+Leertaste`)
+- [x] Ordner konfigurieren (Include/Exclude, z. B. `node_modules`, `.git`, `AppData` ausschließen) *(`~/.localrag/config.toml`)*
+- [x] Dateitypen: `.pdf .docx .xlsx .pptx .txt .md .csv .html .eml/.msg` *(offen: Quellcode, Bilder per OCR)*
+- [x] Inkrementelles Update (neue/geänderte/gelöschte Dateien erkennen)
+- [x] Suche: semantisch + Stichwort, Filter (Ordner, Dateityp, Datum)
+- [x] Fragen beantworten mit **Zitaten** (Datei, Seite, Textausschnitt), Klick öffnet die Datei
+- [x] CLI, Web-UI *(offen: globaler Hotkey, z. B. `Alt+Leertaste`)*
 
 ### Nicht-funktional
 - **100 % lokal** – keine Daten verlassen den Rechner (Standard). Optional Cloud-LLM per Opt-in.
@@ -269,7 +269,7 @@ RAG/
 - [x] LM-Studio-Anbindung (OpenAI-kompatibel, Streaming, `<think>`-Filter), Prompt mit nummerierten Quellen `[1] [2]`
 - [x] `localrag ask "<frage>"` mit Streaming-Ausgabe und Zitaten
 - [ ] Antwortqualität messen (systematisch in Phase 3). Stichprobe mit 4 Fragen: Qwen3.5-9B 3/4, die Haustier-Ausnahme wird falsch auf die Katze angewendet, ein Prompt-Hinweis hilft nicht. Gemma 4 26B-A4B 4/4. Beide brauchen ~3 s, ~2,5 s davon bis zum ersten Token. Die früheren 8–56 s ließen sich im Eval-Korpus nicht reproduzieren, vermutlich Kaltstart
-- [ ] „Ich weiß es nicht“-Verhalten, wenn nichts Relevantes gefunden wird
+- [x] „Ich weiß es nicht“-Verhalten, wenn nichts Relevantes gefunden wird *(fester Satz im Prompt, CLI erkennt ihn)*
 
 **Ergebnis:** Echter RAG – Frage rein, Antwort mit Quellen raus.
 
@@ -293,17 +293,17 @@ RAG/
 ### Phase 4 – Alltagstauglich (1–2 Wochen)
 - [x] Inkrementelle Indexierung (Manifest mit Hash/mtime), gelöschte Dateien entfernen
 - [x] Test über ganze Laufwerke (8.771 Dateien, 57.498 Abschnitte) *(behoben: Junctions, UTF-16, Wort-/Datenlisten, Vektoren im Arbeitsspeicher für Dienst/MCP, schnelles Laden aus sqlite-vec-Blöcken)*
-- [ ] watchdog-Watcher als Hintergrunddienst
-- [ ] Weitere Formate: XLSX, PPTX, HTML, E-Mails (.eml/.msg), Quellcode
+- [x] watchdog-Watcher als Hintergrunddienst *(`localrag watch` oder `serve --watch`, Ereignisse 2 s gesammelt, Abgleich beim Start)*
+- [x] Weitere Formate: XLSX, PPTX, HTML, CSV, E-Mails (.eml/.msg mit Anhängen) *(offen: Quellcode)*
 - [x] OCR für gescannte PDFs *(Windows-OCR, Drehungserkennung, früher leere PDFs werden einmal nachgeholt)*
 - [x] Nahezu gleiche Treffer (Backups, PDF + DOCX) zusammenfassen
-- [ ] Exclude-Regeln, Secret-Filter, Fehler-Log für kaputte Dateien *(Fehler-Log: `localrag status --errors`; Neuversuch nach Parser-Update)*
-- [ ] Filter in der Suche: `type:pdf`, `in:Rechnungen`, `after:2024-01`
+- [x] Exclude-Regeln, Fehler-Log für kaputte Dateien *(Namen, Muster und Pfade; nachträglich ausgeschlossene Dateien verschwinden aus dem Index. Fehler-Log: `localrag status --errors`. Offen: Secret-Filter)*
+- [x] Filter in der Suche: `type:pdf`, `in:Rechnungen`, `-in:Backup`, `after:2024-01`, `before:` *(Vektorsuche exakt in der gefilterten Teilmenge)*
 
 ### Phase 5 – Oberflächen & Integration (1–2 Wochen)
 - [x] FastAPI-Dienst `localrag serve` mit `/search`, `/ask` (NDJSON-Streaming), `/health`; CLI nutzt ihn automatisch
-- [ ] Web-UI: Suchfeld, Antwort, Quellen-Karten, Klick öffnet Datei an der Stelle
-- [x] **MCP-Server** `localrag mcp` → in Claude Desktop/Code einbinden („Durchsuche meine Dateien nach …“) *(Code steht, Tests ausstehend)*
+- [x] Web-UI: Suchfeld, Antwort, Quellen-Karten, Klick öffnet Datei an der Stelle *(PDF im Browser an der Seite; Schutz gegen DNS-Rebinding)*
+- [x] **MCP-Server** `localrag mcp` → in Claude Desktop/Code einbinden („Durchsuche meine Dateien nach …“) *(mit Tests, `--allow` begrenzt auf Ordner)*
 - [ ] Optional: Tray-App mit globalem Hotkey
 
 ### Phase 6 – Profi-Extras (optional, je nach Lust)
@@ -336,13 +336,13 @@ RAG/
 
 ## 9. GitHub aufpolieren – Checkliste
 
-- [ ] **README** mit: Ein-Satz-Pitch, Demo-GIF ganz oben, Features, Architektur-Diagramm (Mermaid), Quickstart in 3 Befehlen, **Benchmark-Tabelle**, Roadmap
-- [ ] Badges: CI, Python-Version, Lizenz
+- [x] **README** mit: Ein-Satz-Pitch, Demo-GIF ganz oben, Features, Architektur-Diagramm (Mermaid), Quickstart in 3 Befehlen, **Benchmark-Tabelle**, Roadmap
+- [x] Badges: CI, Python-Version, Lizenz, Release
 - [ ] Saubere Commits (Conventional Commits: `feat:`, `fix:`, `docs:`), Issues/Milestones pro Phase
-- [ ] `docs/adr/` – kurze Entscheidungsdokumente („Warum SQLite statt Vektordatenbank?“) – zeigt Engineering-Denken
-- [ ] Tests mit sinnvoller Abdeckung (Parser, Chunker, RRF sind gut testbar)
-- [ ] Repo-Topics: `rag`, `llm`, `semantic-search`, `local-first`, `lm-studio`, `vector-database`, `mcp`
-- [ ] Releases mit Changelog
+- [x] `docs/adr/` – kurze Entscheidungsdokumente („Warum SQLite statt Vektordatenbank?“) – zeigt Engineering-Denken
+- [x] Tests mit sinnvoller Abdeckung (Parser, Chunker, RRF sind gut testbar)
+- [x] Repo-Topics: `rag`, `llm`, `semantic-search`, `local-first`, `lm-studio`, `vector-database`, `mcp`
+- [x] Releases mit Changelog *([CHANGELOG.md](CHANGELOG.md))*
 - [ ] Profil-README verlinkt das Projekt als Highlight
 
 ---

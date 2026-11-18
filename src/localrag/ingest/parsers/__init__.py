@@ -7,9 +7,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .base import ParseError, Section, SkippedFile
+from .mail import parse_eml, parse_msg
 from .office import parse_docx
 from .pdf import parse_pdf
+from .slides import parse_pptx
+from .tables import parse_csv, parse_xlsx
 from .text import parse_markdown, parse_txt
+from .web import parse_html
 
 if TYPE_CHECKING:
     from localrag.ingest.ocr import OcrEngine
@@ -22,6 +26,14 @@ PARSERS: dict[str, Parser] = {
     ".md": parse_markdown,
     ".markdown": parse_markdown,
     ".txt": parse_txt,
+    ".csv": parse_csv,
+    ".xlsx": parse_xlsx,
+    ".xlsm": parse_xlsx,
+    ".pptx": parse_pptx,
+    ".html": parse_html,
+    ".htm": parse_html,
+    ".eml": parse_eml,
+    ".msg": parse_msg,
 }
 
 SUPPORTED_EXTENSIONS: frozenset[str] = frozenset(PARSERS)

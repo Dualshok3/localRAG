@@ -198,6 +198,8 @@ def build_server(tools: FileSearchTools):  # pragma: no cover - dünner Adapter,
 
         Args:
             query: Frage oder Stichworte in natürlicher Sprache, z. B. "Kündigungsfrist Mietvertrag".
+                Filter direkt in der Anfrage: type:pdf, in:Ordnerteil, -in:Ordnerteil (ausschließen),
+                after:2024-01, before:2024-06-30 (Änderungsdatum der Datei).
             mode: "auto" (hybrid, falls Vektoren vorhanden), "keyword" (exakte Begriffe, Nummern),
                 "semantic" (Bedeutung, Umschreibungen) oder "hybrid".
             limit: Anzahl Treffer (1–25).

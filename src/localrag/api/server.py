@@ -3,12 +3,19 @@
 Start:  localrag serve            (Standard: http://127.0.0.1:8765, nur von diesem Rechner erreichbar)
 
 Endpunkte
+- GET  /                           Web-Oberfläche (Suche, Antwort, Quellen-Karten)
 - GET  /health                     Status, Index-Pfad, Embedding-Modell
 - GET  /search?q=…&mode=…&limit=…  Trefferliste als JSON
 - POST /ask                        Antwort als NDJSON-Stream: sources → token… → done
+- GET  /file/{document_id}         indexierte Datei ausliefern (PDF im Browser an Seite #page=N)
+- POST /open                       indexierte Datei mit dem Standardprogramm öffnen bzw. im Explorer zeigen
 
 Achtung: Der Dienst gibt Inhalte deiner Dateien heraus. Er bindet deshalb standardmäßig nur an
 127.0.0.1 und sollte nie an 0.0.0.0 oder ins Netz freigegeben werden.
+
+Schutz gegen fremde Webseiten im selben Browser: Anfragen mit fremdem Host-Header werden abgelehnt
+(DNS-Rebinding), und /open verlangt einen eigenen Header, den eine fremde Seite nicht ohne CORS-Freigabe
+senden kann – die es nicht gibt. Herausgegeben werden nur Dateien, die im Index stehen.
 """
 
 from __future__ import annotations
@@ -16,14 +23,17 @@ from __future__ import annotations
 import dataclasses
 import json
 import os
+import subprocess
+import sys
 import threading
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
+from importlib import resources
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, Header, HTTPException, Query, Request
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from localrag import __version__
@@ -41,6 +51,25 @@ DEFAULT_PORT = 8765
 ENV_SERVER = "LOCALRAG_SERVER"
 
 ModeParam = Literal["auto", "keyword", "semantic", "hybrid"]
+LOCAL_HOSTS = ("127.0.0.1", "localhost", "::1")
+UI_HEADER = "X-LocalRAG"
+
+
+class OpenRequest(BaseModel):
+    document_id: int
+    reveal: bool = False  # True = Ordner im Explorer zeigen statt Datei öffnen
+
+
+def open_with_system(path: Path, *, reveal: bool = False) -> None:  # pragma: no cover - startet Programme
+    if sys.platform == "win32":
+        if reveal:
+            subprocess.Popen(["explorer", "/select,", str(path)])
+        else:
+            os.startfile(str(path))  # type: ignore[attr-defined]
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", "-R", str(path)] if reveal else ["open", str(path)])
+    else:
+        subprocess.Popen(["xdg-open", str(path.parent if reveal else path)])
 
 
 class AskRequest(BaseModel):
@@ -86,8 +115,11 @@ def create_app(
     load_model: bool = True,
     llm_factory: Callable[[str | None], ChatClient] | None = None,
     reranker: Reranker | None = None,
+    allowed_hosts: Iterable[str] = LOCAL_HOSTS,
+    opener: Callable[..., None] = open_with_system,
 ) -> FastAPI:
     db_path = Path(db_path).resolve()
+    hosts = {h.strip("[]").lower() for h in allowed_hosts}
     if embedder is None and load_model:
         embedder = default_embedder_for(db_path)
     make_llm = llm_factory or (lambda model: ChatClient(model=model))
@@ -107,6 +139,52 @@ def create_app(
     app = FastAPI(title="LocalRAG", version=__version__)
     app.state.embedder = embedder
     app.state.reranker = reranker
+    app.state.model_lock = model_lock  # für den Watcher in `serve --watch`
+    app.state.watcher = None
+
+    @app.middleware("http")
+    async def only_local_hosts(request: Request, call_next):
+        # DNS-Rebinding: eine fremde Domain, die auf 127.0.0.1 zeigt, hätte sonst Zugriff wie die eigene Seite
+        host = (request.headers.get("host") or "").rsplit(":", 1)[0].strip("[]").lower()
+        if hosts and host not in hosts:
+            return JSONResponse({"detail": "Host nicht erlaubt"}, status_code=403)
+        return await call_next(request)
+
+    def document(document_id: int) -> Path:
+        row = connection().conn.execute("SELECT path FROM documents WHERE id = ?", (document_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "Datei nicht im Index")
+        path = Path(row["path"])
+        if not path.is_file():
+            raise HTTPException(410, "Datei existiert nicht mehr")
+        return path
+
+    @app.get("/", response_class=HTMLResponse)
+    def ui() -> HTMLResponse:
+        html = resources.files("localrag.api").joinpath("static/index.html").read_text(encoding="utf-8")
+        return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
+
+    @app.get("/file/{document_id}")
+    def file_endpoint(document_id: int) -> FileResponse:
+        path = document(document_id)
+        # inline: PDFs, Bilder und Text zeigt der Browser direkt an, Office-Dateien lädt er herunter
+        return FileResponse(path, filename=path.name, content_disposition_type="inline")
+
+    @app.post("/open")
+    def open_endpoint(
+        req: OpenRequest, x_localrag: Annotated[str | None, Header(alias=UI_HEADER)] = None
+    ) -> dict[str, Any]:
+        if x_localrag != "1":
+            raise HTTPException(403, f"Header {UI_HEADER} fehlt")
+        path = document(req.document_id)
+        opener(path, reveal=req.reveal)
+        return {"opened": str(path), "reveal": req.reveal}
+
+    @app.get("/stats")
+    def stats_endpoint() -> dict[str, Any]:
+        st = connection().stats()
+        return {"documents": sum(st["by_status"].values()), "chunks": st["chunks"], **st}  # type: ignore[arg-type]
+
     app.state.db_path = db_path
 
     def resolved_mode(mode: str) -> str:
@@ -125,6 +203,7 @@ def create_app(
             "db_exists": db_path.exists(),
             "embedding_model": embedder.name if embedder else None,
             "reranker": reranker.name if reranker else None,
+            "watching": [str(r) for r in app.state.watcher.roots] if app.state.watcher else None,
         }
 
     @app.get("/search")

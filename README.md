@@ -2,9 +2,16 @@
 
 [![CI](https://github.com/Dualshok3/RAG/actions/workflows/ci.yml/badge.svg)](https://github.com/Dualshok3/RAG/actions/workflows/ci.yml)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
+[![Lizenz: MIT](https://img.shields.io/badge/lizenz-MIT-green)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/Dualshok3/RAG)](https://github.com/Dualshok3/RAG/releases)
 ![100 % lokal](https://img.shields.io/badge/daten-100%25%20lokal-success)
 
 > Frag deinen Computer in natürlicher Sprache – komplett lokal, mit Quellenangabe.
+
+![Web-Oberfläche: Suche, Antwort mit Quellen, Filter](docs/images/demo.gif)
+
+*Web-Oberfläche (`localrag serve`, dann http://127.0.0.1:8765) über den erfundenen Testkorpus: Suche,
+Antwort mit Zitaten von Gemma 4 26B, Filter nach Ordner und Datum. Die Zeiten sind echt.*
 
 Die Windows-Suche findet Dateinamen und exakte Wörter. LocalRAG versteht den **Inhalt**: Die Frage
 „Darf ich eine Katze halten?“ findet den Paragrafen *Haustiere* im Mietvertrag, obwohl das Wort „Katze“
@@ -35,13 +42,18 @@ Quellen
 - 🎯 **Optionaler Reranker:** `--rerank` sortiert die Kandidaten mit einem Cross-Encoder neu, hilft bei
   umschriebenen Fragen, kostet aber rund 0,3 s pro Suche
   ([Messung](#härtere-fragen-gewichtung-und-reranker)).
-- 🚀 **Hintergrunddienst:** `localrag serve` hält das Modell geladen, Suchen dauern dann Millisekunden.
+- 🧭 **Filter in der Anfrage:** `type:pdf`, `in:Rechnungen`, `-in:Backup`, `after:2024-01`,
+  `before:2024-07` – in CLI, Web-Oberfläche, API und MCP.
+- 🚀 **Hintergrunddienst mit Web-Oberfläche:** `localrag serve` hält das Modell geladen, Suchen dauern dann
+  Millisekunden. Treffer lassen sich mit einem Klick öffnen, PDFs direkt an der richtigen Seite.
+- 👀 **Immer aktuell:** `localrag watch` oder `serve --watch` beobachtet die Ordner und indexiert neue,
+  geänderte und gelöschte Dateien nach wenigen Sekunden.
 - 🤖 **MCP-Server:** Claude Desktop, Claude Code und andere Clients können direkt in den Dateien suchen.
 - 📊 **Gemessen statt behauptet:** Ein Eval-Set vergleicht Stichwort-, Vektor- und Hybridsuche, die
   Ergebnisse stehen [weiter unten](#messung-stichwort-vs-vektor-vs-hybrid).
 
-Formate: PDF (gescannte PDFs per OCR, unter Windows ohne Zusatzsoftware), DOCX, Markdown, TXT. Weitere
-Formate sind geplant, siehe [PLAN.md](PLAN.md).
+Formate: PDF (gescannte PDFs per OCR, unter Windows ohne Zusatzsoftware), DOCX, XLSX, PPTX, HTML,
+E-Mails (EML, MSG), Markdown, TXT, CSV.
 
 ## Quickstart
 
@@ -58,11 +70,81 @@ uv run localrag status --errors
 
 | Variable | Bedeutung | Standard |
 |---|---|---|
-| `LOCALRAG_DB` | Index-Datenbank (auch `--db`) | `~/.localrag/localrag.db` |
+| `LOCALRAG_DB` | Index-Datenbank (auch `--db`) | `db` aus der Konfiguration, sonst `~/.localrag/localrag.db` |
+| `LOCALRAG_CONFIG` | Konfigurationsdatei | `~/.localrag/config.toml` |
 | `LOCALRAG_MODELS` | Speicherort der Modelle (~4,5 GB) | Hugging-Face-Cache |
 | `LOCALRAG_EMBEDDING_MODEL` | Embedding-Modell | `BAAI/bge-m3` |
 | `LOCALRAG_LLM_URL` | OpenAI-kompatibler Chat-Server | `http://localhost:1234/v1` (LM Studio) |
 | `LOCALRAG_LLM_MODEL` | Modell-ID auf dem Server | bereits geladenes Modell |
+
+### Konfiguration: welche Ordner, was nicht
+
+Statt die Ordner bei jedem Aufruf anzugeben, stehen sie in `~/.localrag/config.toml`
+(Vorlage mit `localrag config --init`, Anzeige mit `localrag config`):
+
+```toml
+folders = ["D:/Dokumente", "C:/Users/ich/Desktop"]
+exclude = ["python_projects", "*backup*", "D:/Dokumente/Alt"]
+max_file_mb = 50
+db = "D:/localrag/index.db"
+```
+
+`exclude`: Ein Name oder Muster gilt für Ordner und Dateien an beliebiger Stelle, ein Pfad nur für genau
+diesen Ordner. Die eingebauten Ausschlüsse (`node_modules`, `.git`, `AppData`, `Windows`, …) gelten
+zusätzlich. Kommt ein Ausschluss später dazu, verschwinden die betroffenen Dateien beim nächsten Lauf aus
+dem Index. `localrag index` ohne Ordner nimmt dann `folders`.
+
+Warum das wichtig ist, zeigt der [Test über ganze Laufwerke](#ganze-laufwerke): Kopien persönlicher
+Angaben in Code-Projekten verdrängten dort die Originale. `exclude = ["python_projects"]` löst das an der
+Wurzel, `-in:python_projects` in der Anfrage im Einzelfall.
+
+### Filter in der Anfrage
+
+```bash
+uv run localrag search "Stromrechnung type:pdf after:2024"
+uv run localrag search "Kündigung in:Wohnung -in:Backup"
+uv run localrag ask "Wie hoch war der Abschlag? in:Stadtwerke before:2024-07"
+```
+
+| Filter | Wirkung |
+|---|---|
+| `type:pdf`, `type:pdf,docx` | nur diese Dateitypen |
+| `in:Rechnungen`, `in:"Meine Dokumente"` | Pfad enthält diesen Teil (ohne Groß-/Kleinschreibung) |
+| `-in:Backup` | Pfad enthält ihn nicht |
+| `after:2024`, `after:2024-03`, `after:2024-03-15` | Datei ab diesem Zeitpunkt geändert |
+| `before:2024-07` | Datei vor diesem Zeitpunkt geändert |
+
+Die Vektorsuche rechnet bei Filtern exakt in der passenden Teilmenge, statt global zu suchen und danach
+auszusieben. Sonst bliebe bei `in:Rechnungen` oft nichts übrig, weil die besten Treffer des ganzen Index
+woanders liegen.
+
+### Index aktuell halten
+
+```bash
+uv run localrag watch                # Ordner aus der Konfiguration beobachten (eigener Prozess)
+uv run localrag serve --watch        # oder im Dienst: ein Prozess, ein geladenes Modell
+```
+
+Beim Start wird einmal abgeglichen, was sich in der Zwischenzeit geändert hat. Danach sammelt der Watcher
+Dateiereignisse und verarbeitet sie nach 2 s Ruhe gemeinsam. Ein Programm, das beim Speichern mehrmals
+schreibt, löst so nur eine Neuindexierung aus. Gelöschte und umbenannte Dateien und Ordner verschwinden
+aus dem Index. Für den Autostart unter Windows genügt eine geplante Aufgabe:
+
+```bash
+schtasks /Create /SC ONLOGON /TN LocalRAG /TR "uv --directory C:\pfad\zu\RAG run localrag serve --watch"
+```
+
+### Web-Oberfläche
+
+`localrag serve` liefert unter http://127.0.0.1:8765 eine Oberfläche ohne externe Abhängigkeiten:
+Suchen mit `Enter`, Fragen mit `Strg`+`Enter`, Zitate `[n]` springen zur Quelle. „Öffnen“ startet das
+Standardprogramm, „Im Ordner zeigen“ den Explorer, PDFs öffnen auf Wunsch im Browser an der gefundenen
+Seite. Die Seite folgt dem hellen oder dunklen Farbschema des Systems und funktioniert auch auf schmalen
+Fenstern.
+
+Schutz gegen fremde Webseiten im selben Browser: Der Dienst lehnt Anfragen mit fremdem Host-Header ab
+(DNS-Rebinding), und Öffnen geht nur mit einem eigenen Header, den eine fremde Seite ohne CORS-Freigabe
+nicht senden darf. Ausgeliefert werden nur Dateien, die im Index stehen.
 
 ### Fragen beantworten (lokales LLM)
 
@@ -98,7 +180,8 @@ uv run localrag search "…"       # nutzt den Dienst automatisch → Antwort in
 uv run localrag search "…" --local   # Dienst ignorieren
 ```
 
-Der Dienst bietet auch eine HTTP-API (`/search`, `/ask`, `/health`, Doku unter `http://127.0.0.1:8765/docs`).
+Der Dienst bietet auch eine HTTP-API (`/search`, `/ask`, `/health`, `/stats`, `/file`, `/open`, Doku unter
+`http://127.0.0.1:8765/docs`).
 Weil er Inhalte deiner Dateien herausgibt, bindet er standardmäßig nur an 127.0.0.1.
 
 ### Als Werkzeug für Claude (MCP)
@@ -299,18 +382,21 @@ flowchart LR
 
 | Schritt | Umsetzung | Code |
 |---|---|---|
-| Parsen | PyMuPDF (PDF, pro Seite), python-docx (Überschriften, Tabellen), Markdown/TXT | [ingest/parsers](src/localrag/ingest/parsers) |
+| Parsen | PyMuPDF (PDF, pro Seite), python-docx (Überschriften, Tabellen), openpyxl (je Tabellenblatt), python-pptx (je Folie, mit Notizen), HTML, E-Mails (EML/MSG mit Anhängen), Markdown/TXT/CSV | [ingest/parsers](src/localrag/ingest/parsers) |
+| Aktualisieren | watchdog-Ereignisse, 2 s gesammelt, dann inkrementell wie `localrag index` | [watcher.py](src/localrag/ingest/watcher.py) |
 | Chunking | Absätze zu ~350 Wörtern packen, 50 Wörter Überlappung, Überschriftenpfad merken | [chunker.py](src/localrag/ingest/chunker.py) |
 | Stichwortindex | FTS5 mit BM25, Text vorab per Snowball auf Wortstämme reduziert | [text_norm.py](src/localrag/index/text_norm.py) |
 | Vektorindex | bge-m3 (1024 Dim., fp16 auf CUDA), normalisiert in sqlite-vec | [vector_store.py](src/localrag/index/vector_store.py) |
+| Filter | `type:` `in:` `-in:` `after:` `before:` aus der Anfrage, Vektorsuche exakt in der Teilmenge | [filters.py](src/localrag/retrieval/filters.py) |
 | Fusion | Reciprocal Rank Fusion (k = 60), BM25-Liste bei ganzen Sätzen 0.3-fach gewichtet | [hybrid.py](src/localrag/retrieval/hybrid.py) |
 | Reranking (optional) | bge-reranker-v2-m3 liest Frage + Abschnitt gemeinsam und sortiert die Top 40 neu | [reranker.py](src/localrag/retrieval/reranker.py) |
 | Antwort | Prompt nur mit Quellen, Zitatpflicht, Schutz vor Anweisungen in Dokumenten | [prompts.py](src/localrag/generation/prompts.py) |
 
 ## Geplant
 
-Excel, PowerPoint, E-Mails · OCR für Bilddateien und andere
-Betriebssysteme · Dateiüberwachung · Web-Oberfläche. Reihenfolge und Begründung stehen in [PLAN.md](PLAN.md).
+OCR für Bilddateien · Tray-App mit globalem Hotkey · Bildersuche (CLIP/SigLIP) · Windows-USN-Journal statt
+Dateiereignissen. Reihenfolge und Begründung stehen in [PLAN.md](PLAN.md), Änderungen im
+[CHANGELOG](CHANGELOG.md).
 
 ## Keine privaten Daten im Repo
 
@@ -325,7 +411,7 @@ Das Projekt arbeitet mit sehr persönlichen Dateien, deshalb gibt es mehrere Sic
 
 ## Tech-Stack
 
-Python 3.12 · uv · PyTorch/CUDA · sentence-transformers · SQLite (FTS5 + sqlite-vec) · LM Studio (OpenAI-API) · httpx · FastAPI · Typer · MCP
+Python 3.12 · uv · PyTorch/CUDA · sentence-transformers · SQLite (FTS5 + sqlite-vec) · LM Studio (OpenAI-API) · httpx · FastAPI · Typer · watchdog · MCP
 
 ## Entwickeln
 

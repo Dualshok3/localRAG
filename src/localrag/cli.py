@@ -17,8 +17,17 @@ from rich.text import Text
 
 from localrag import __version__
 from localrag.api.client import ServiceClient
-from localrag.api.server import DEFAULT_HOST, DEFAULT_PORT
-from localrag.config import DEFAULT_EXCLUDED_DIRS, DEFAULT_MAX_FILE_MB, ENV_DB, default_db_path
+from localrag.api.server import DEFAULT_HOST, DEFAULT_PORT, LOCAL_HOSTS
+from localrag.config import (
+    CONFIG_TEMPLATE,
+    DEFAULT_EXCLUDED_DIRS,
+    ENV_DB,
+    Config,
+    ConfigError,
+    config_path,
+    default_db_path,
+    load_config,
+)
 from localrag.generation.answer import AnswerResult, retrieve_sources, stream_answer
 from localrag.generation.llm import ENV_LLM_MODEL, ENV_LLM_URL, ChatClient, LLMError
 from localrag.generation.prompts import source_label
@@ -28,6 +37,7 @@ from localrag.index.vector_store import EmbeddingModelMismatchError, VectorStore
 from localrag.ingest.indexer import IndexStats, index_paths
 from localrag.ingest.ocr import OcrUnavailableError, load_ocr
 from localrag.ingest.scanner import FileInfo
+from localrag.retrieval.filters import parse_query
 from localrag.retrieval.hybrid import search as run_search
 from localrag.retrieval.reranker import CrossEncoderReranker, Reranker
 
@@ -76,6 +86,13 @@ def serve(
     port: Annotated[int, typer.Option(help="Port.")] = DEFAULT_PORT,
     no_model: Annotated[bool, typer.Option("--no-model", help="Ohne Embedding-Modell (nur BM25).")] = False,
     rerank: RerankOption = False,
+    watch: Annotated[
+        bool,
+        typer.Option(
+            "--watch",
+            help="Zusätzlich die Ordner aus der Konfiguration beobachten und den Index aktuell halten.",
+        ),
+    ] = False,
 ) -> None:
     """Startet den lokalen Dienst: Modell bleibt geladen, `search`/`ask` antworten dann sofort."""
     import uvicorn
@@ -92,13 +109,35 @@ def serve(
         console.print(f"[red]Kein Index unter {db}[/red] – zuerst `localrag index <ordner>` ausführen.")
         raise typer.Exit(1)
     with console.status("Lade Embedding-Modell…"):
-        application = create_app(db, load_model=not no_model, reranker=_load_reranker(rerank))
+        application = create_app(
+            db,
+            load_model=not no_model,
+            reranker=_load_reranker(rerank),
+            allowed_hosts=(*LOCAL_HOSTS, host),
+        )
     model = application.state.embedder.name if application.state.embedder else "keins (nur BM25)"
     if application.state.reranker:
         model += f" + {application.state.reranker.name}"
     console.print(f"[green]LocalRAG-Dienst[/green] auf http://{host}:{port} · Modell: {model} · Index: {db}")
+    console.print(f"Web-Oberfläche: [link=http://{host}:{port}/]http://{host}:{port}/[/link]")
+    watcher = None
+    if watch:
+        cfg = _config_or_exit()
+        if not cfg.folders:
+            console.print(f"[red]--watch braucht `folders` in {config_path()}[/red]")
+            raise typer.Exit(2)
+        watcher = _make_watcher(
+            db, list(cfg.folders), cfg, None, application.state.embedder, application.state.model_lock
+        )
+        application.state.watcher = watcher
+        watcher.start(catch_up=True)
+        console.print("Beobachte: " + ", ".join(map(str, watcher.roots)))
     console.print("[dim]Beenden mit Strg+C[/dim]")
-    uvicorn.run(application, host=host, port=port, log_level="warning")
+    try:
+        uvicorn.run(application, host=host, port=port, log_level="warning")
+    finally:
+        if watcher is not None:
+            watcher.stop()
 
 
 @app.command("mcp")
@@ -133,12 +172,18 @@ def mcp_command(
 
 @app.command()
 def index(
-    paths: Annotated[list[Path], typer.Argument(help="Ordner oder Dateien, die indexiert werden.")],
     db: DbOption,
-    exclude: Annotated[
-        list[str] | None, typer.Option("--exclude", "-x", help="Zusätzliche Ordnernamen ausschließen.")
+    paths: Annotated[
+        list[Path] | None,
+        typer.Argument(help="Ordner oder Dateien. Ohne Angabe: `folders` aus der Konfiguration."),
     ] = None,
-    max_file_mb: Annotated[float, typer.Option(help="Größere Dateien überspringen.")] = DEFAULT_MAX_FILE_MB,
+    exclude: Annotated[
+        list[str] | None,
+        typer.Option("--exclude", "-x", help="Zusätzlich ausschließen: Name, Muster (*backup*) oder Pfad."),
+    ] = None,
+    max_file_mb: Annotated[
+        float | None, typer.Option(help="Größere Dateien überspringen (Standard aus Konfiguration: 50).")
+    ] = None,
     embed: Annotated[
         bool | None,
         typer.Option("--embed/--no-embed", help="Vektoren erzeugen (Standard: wenn installiert)."),
@@ -152,12 +197,21 @@ def index(
     ] = "auto",
 ) -> None:
     """Indexiert Ordner inkrementell (nur neue und geänderte Dateien) und erzeugt Vektoren."""
+    cfg = _config_or_exit()
+    paths = paths or list(cfg.folders)
+    if not paths:
+        console.print(
+            "[red]Keine Ordner angegeben.[/red] `localrag index <ordner>` oder `folders` in "
+            f"{config_path()} eintragen (Vorlage: `localrag config --init`)."
+        )
+        raise typer.Exit(2)
     missing = [p for p in paths if not p.exists()]
     if missing:
         console.print(f"[red]Nicht gefunden:[/red] {', '.join(map(str, missing))}")
         raise typer.Exit(1)
 
-    excluded = set(DEFAULT_EXCLUDED_DIRS) | set(exclude or [])
+    excluded = cfg.exclusions(exclude)
+    max_file_mb = max_file_mb or cfg.max_file_mb
     try:
         ocr_engine = load_ocr(ocr)
     except (OcrUnavailableError, ValueError) as exc:
@@ -227,9 +281,118 @@ def index(
     console.print(f"[dim]Index: {db}[/dim]")
 
 
+def _make_watcher(db: Path, roots: list[Path], cfg: Config, exclude, embedder, lock=None):
+    from localrag.ingest.scanner import Exclusions
+    from localrag.ingest.watcher import FolderWatcher, WatchBatch
+
+    def report(batch: WatchBatch) -> None:
+        stamp = time.strftime("%H:%M:%S")
+        if batch.error:
+            console.print(f"[dim]{stamp}[/dim] [red]Fehler:[/red] {batch.error}")
+            return
+        s = batch.stats
+        parts = [
+            f"{n} {label}"
+            for n, label in (
+                (s.added, "neu"),
+                (s.updated, "aktualisiert"),
+                (s.removed, "entfernt"),
+                (s.failed, "Fehler"),
+                (s.embedded, "Vektoren"),
+            )
+            if n
+        ]
+        if not parts:
+            return  # z. B. nur gespeichert, Inhalt unverändert
+        names = ", ".join(p.name for p in batch.paths[:3]) + (" …" if len(batch.paths) > 3 else "")
+        console.print(f"[dim]{stamp}[/dim] {' · '.join(parts)} [dim]({names}, {batch.seconds:.1f} s)[/dim]")
+
+    return FolderWatcher(
+        db,
+        roots,
+        exclusions=Exclusions(cfg.exclusions(exclude)),
+        embedder=embedder,
+        max_file_mb=cfg.max_file_mb,
+        lock=lock,
+        on_batch=report,
+    )
+
+
+@app.command()
+def watch(
+    db: DbOption,
+    paths: Annotated[
+        list[Path] | None,
+        typer.Argument(help="Ordner. Ohne Angabe: `folders` aus der Konfiguration."),
+    ] = None,
+    exclude: Annotated[
+        list[str] | None,
+        typer.Option("--exclude", "-x", help="Zusätzlich ausschließen: Name, Muster (*backup*) oder Pfad."),
+    ] = None,
+    embed: Annotated[
+        bool | None,
+        typer.Option("--embed/--no-embed", help="Vektoren erzeugen (Standard: wenn installiert)."),
+    ] = None,
+    catch_up: Annotated[
+        bool, typer.Option("--catch-up/--no-catch-up", help="Beim Start einmal alles abgleichen.")
+    ] = True,
+) -> None:
+    """Beobachtet Ordner und hält den Index aktuell (neue, geänderte, gelöschte Dateien).
+
+    Läuft der Dienst ohnehin, ist `localrag serve --watch` sparsamer: ein Prozess, ein geladenes Modell.
+    """
+    cfg = _config_or_exit()
+    roots = paths or list(cfg.folders)
+    if not roots:
+        console.print(
+            f"[red]Keine Ordner angegeben.[/red] `localrag watch <ordner>` oder `folders` in {config_path()}."
+        )
+        raise typer.Exit(2)
+    missing = [p for p in roots if not p.exists()]
+    if missing:
+        console.print(f"[red]Nicht gefunden:[/red] {', '.join(map(str, missing))}")
+        raise typer.Exit(1)
+    if not db.exists() and catch_up is False:
+        console.print(f"[red]Kein Index unter {db}[/red] – mit --catch-up starten oder zuerst indexieren.")
+        raise typer.Exit(1)
+
+    embedder = None
+    if embed is not False:
+        has_vectors = False
+        if db.exists():
+            with Database(db) as database:
+                store = VectorStore(database)
+                has_vectors = bool(store.available and store.model)
+                if has_vectors:  # dasselbe Modell wie der Index
+                    embedder = _load_embedder_for_search(database, "auto")
+        if not has_vectors:
+            embedder = _load_embedder_for_index(embed, None)
+
+    watcher = _make_watcher(db, roots, cfg, exclude, embedder)
+    model = embedder.name if embedder else "ohne Vektoren"
+    console.print(f"[green]Beobachte[/green] {', '.join(map(str, watcher.roots))} · {model} · Index: {db}")
+    if catch_up:
+        console.print("[dim]Gleiche zuerst den Index ab …[/dim]")
+    console.print("[dim]Beenden mit Strg+C[/dim]")
+    watcher.start(catch_up=catch_up)
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        console.print("Beende …")
+    finally:
+        watcher.stop()
+
+
 @app.command()
 def search(
-    query: Annotated[str, typer.Argument(help="Suchanfrage in natürlicher Sprache oder Stichworte.")],
+    query: Annotated[
+        str,
+        typer.Argument(
+            help="Suchanfrage in natürlicher Sprache oder Stichworte. Filter: type:pdf, in:Ordner, "
+            "-in:Ordner, after:2024-01, before:2024-06-30"
+        ),
+    ],
     db: DbOption,
     limit: Annotated[int, typer.Option("--limit", "-k", help="Anzahl Treffer.")] = 10,
     filetype: Annotated[
@@ -246,10 +409,14 @@ def search(
     local: LocalOption = False,
     rerank: RerankOption = False,
 ) -> None:
-    """Durchsucht den Index: Stichworte (BM25), Bedeutung (Vektoren) oder beides (hybrid)."""
+    """Durchsucht den Index: Stichworte (BM25), Bedeutung (Vektoren) oder beides (hybrid).
+
+    Beispiel: localrag search "Stromrechnung type:pdf in:Rechnungen after:2024"
+    """
     if not db.exists():
         console.print(f"[red]Kein Index unter {db}[/red] – zuerst `localrag index <ordner>` ausführen.")
         raise typer.Exit(1)
+    filter_note = _filter_note(query)
     if mode not in ("auto", "keyword", "semantic", "hybrid"):
         console.print(f"[red]Unbekannter Modus {mode!r}[/red]")
         raise typer.Exit(2)
@@ -306,7 +473,7 @@ def search(
         return
 
     if not hits:
-        console.print(f"Keine Treffer ({elapsed_ms:.0f} ms).")
+        console.print(f"Keine Treffer ({elapsed_ms:.0f} ms){filter_note}.")
         return
 
     for i, h in enumerate(hits, start=1):
@@ -322,7 +489,7 @@ def search(
             names = ", ".join(Path(p).name for p in h.duplicates[:2])
             more = f" und {len(h.duplicates) - 2} weitere" if len(h.duplicates) > 2 else ""
             console.print(f"    [dim]+ gleicher Inhalt in {names}{more}[/dim]")
-    console.print(f"[dim]{len(hits)} Treffer in {elapsed_ms:.0f} ms ({resolved})[/dim]")
+    console.print(f"[dim]{len(hits)} Treffer in {elapsed_ms:.0f} ms ({resolved}){filter_note}[/dim]")
 
 
 @app.command()
@@ -346,10 +513,14 @@ def ask(
     local: LocalOption = False,
     rerank: RerankOption = False,
 ) -> None:
-    """Beantwortet eine Frage aus deinen Dateien – mit Quellenangaben (lokales LLM, z. B. LM Studio)."""
+    """Beantwortet eine Frage aus deinen Dateien – mit Quellenangaben (lokales LLM, z. B. LM Studio).
+
+    Filter wie bei `search`, z. B. "Wie hoch war der Abschlag? in:Stadtwerke after:2024"
+    """
     if not db.exists():
         console.print(f"[red]Kein Index unter {db}[/red] – zuerst `localrag index <ordner>` ausführen.")
         raise typer.Exit(1)
+    _filter_note(question)
     if mode not in ("auto", "keyword", "semantic", "hybrid"):
         console.print(f"[red]Unbekannter Modus {mode!r}[/red]")
         raise typer.Exit(2)
@@ -478,6 +649,14 @@ def _print_answer_footer(
     )
 
 
+def _filter_note(query: str) -> str:
+    """Warnt vor unlesbaren Filtern und liefert eine kurze Angabe der aktiven Filter für die Fußzeile."""
+    _, flt = parse_query(query)
+    for err in flt.errors:
+        console.print(f"[yellow]{err}[/yellow]")
+    return f" · Filter: {flt.describe()}" if flt.active else ""
+
+
 def _service_for(db: Path) -> ServiceClient | None:
     """Laufenden Dienst für genau diesen Index finden, sonst None (dann wird lokal gesucht)."""
     client = ServiceClient()
@@ -528,6 +707,42 @@ def _print_embed_info(stats: IndexStats, embedder: Embedder | None) -> None:
         console.print("[dim]Ohne Vektoren (nur Stichwortsuche). Für semantische Suche: --embed[/dim]")
     else:
         console.print(f"[dim]{stats.embedded} neue Vektoren mit {embedder.name}[/dim]")
+
+
+def _config_or_exit() -> Config:
+    try:
+        return load_config()
+    except ConfigError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(2) from exc
+
+
+@app.command("config")
+def config_command(
+    init: Annotated[
+        bool, typer.Option("--init", help="Vorlage anlegen, falls noch keine existiert.")
+    ] = False,
+) -> None:
+    """Zeigt die Konfiguration (Ordner, Ausschlüsse, Index) oder legt mit --init eine Vorlage an."""
+    path = config_path()
+    if init:
+        if path.exists():
+            console.print(f"Konfiguration existiert schon: {path}")
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(CONFIG_TEMPLATE, encoding="utf-8")
+            console.print(f"[green]Vorlage angelegt:[/green] {path}")
+        return
+    cfg = _config_or_exit()
+    console.print(
+        f"[bold]Konfiguration[/bold] {path}" + ("" if cfg.source else " [dim](nicht vorhanden)[/dim]")
+    )
+    console.print(f"Index:       {default_db_path()}")
+    console.print("Ordner:      " + (", ".join(map(str, cfg.folders)) or "[dim]keine[/dim]"))
+    console.print("Ausschlüsse: " + (", ".join(cfg.exclude) or "[dim]keine eigenen[/dim]"))
+    if cfg.default_excludes:
+        console.print(f"[dim]+ eingebaut: {', '.join(sorted(DEFAULT_EXCLUDED_DIRS))}[/dim]")
+    console.print(f"Max. Dateigröße: {cfg.max_file_mb:g} MB")
 
 
 @app.command()

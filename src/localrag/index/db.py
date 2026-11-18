@@ -81,13 +81,18 @@ class Database:
         self.path = Path(path)
         if str(path) != ":memory:":
             self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(str(path))
+        # Wartezeit bei gesperrter Datei: Dienst, Watcher und CLI greifen gleichzeitig zu
+        self.conn = sqlite3.connect(str(path), timeout=30)
         self.conn.row_factory = sqlite3.Row
         self.conn.enable_load_extension(True)
         sqlite_vec.load(self.conn)
         self.conn.enable_load_extension(False)
+        # SQLites lower() kennt nur ASCII → für Pfadfilter mit Umlauten („in:Überweisungen“)
+        self.conn.create_function("casefold", 1, lambda v: v.casefold() if v else v, deterministic=True)
         self.conn.execute("PRAGMA foreign_keys = ON")
-        self.conn.execute("PRAGMA journal_mode = WAL")
+        # Umschalten braucht eine exklusive Sperre und wartet nicht → nur, wenn nötig (einmalig)
+        if self.conn.execute("PRAGMA journal_mode").fetchone()[0].lower() != "wal":
+            self.conn.execute("PRAGMA journal_mode = WAL")
         self.conn.execute("PRAGMA synchronous = NORMAL")
         self.conn.executescript(_SCHEMA)
         self._migrate()
@@ -102,7 +107,8 @@ class Database:
             if "embedded" not in cols:
                 self.conn.execute("ALTER TABLE chunks ADD COLUMN embedded INTEGER NOT NULL DEFAULT 0")
             self.conn.executescript(_SCHEMA_V2_INDEX)
-        self.set_meta("schema_version", str(SCHEMA_VERSION))
+        if version != SCHEMA_VERSION:  # sonst bei jedem Öffnen ein unnötiger Schreibzugriff
+            self.set_meta("schema_version", str(SCHEMA_VERSION))
 
     # --- Meta ----------------------------------------------------------------------------------
 

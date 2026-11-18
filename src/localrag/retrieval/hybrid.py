@@ -19,6 +19,7 @@ from localrag.index.db import Database
 from localrag.index.embedder import Embedder
 from localrag.index.text_norm import STOPWORDS, query_terms
 from localrag.index.vector_store import VectorStore
+from localrag.retrieval.filters import SearchFilter, parse_query
 from localrag.retrieval.keyword import SearchHit, keyword_ranking, make_snippet
 from localrag.retrieval.reranker import Reranker
 
@@ -30,6 +31,9 @@ RERANK_DEPTH = 40  # so viele Abschnitte der ersten Stufe liest der Reranker
 RERANK_BLEND: float | None = None
 SENTENCE_KEYWORD_WEIGHT = 0.3  # Gewicht der BM25-Liste bei Fragen in ganzen Sätzen (gemessen: 0.3 > 0.5)
 SHORT_QUERY_WORDS = 3
+# Bis zu so vielen Abschnitten wird bei aktivem Filter exakt in der Teilmenge gesucht, darüber global
+# mit mehr Kandidaten und anschließendem Filtern.
+EXACT_FILTER_LIMIT = 30_000
 _CODE_LIKE = re.compile(r"\d|[A-ZÄÖÜ]{2,}|[_.]\w")  # Ziffern, Abkürzungen, Dateinamen/Kennungen
 _WORD_CHARS = re.compile(r"[^\W_]+")
 
@@ -81,18 +85,25 @@ def search(
     rerank_depth: int = RERANK_DEPTH,
     keyword_weight: float | None = None,
     rerank_blend: float | None = RERANK_BLEND,
+    flt: SearchFilter | None = None,
+    parse_filters: bool = True,
 ) -> list[SearchHit]:
     """Trefferliste, ein Treffer pro Datei (außer ``one_per_document=False``).
 
     keyword_weight: Gewicht der BM25-Liste im Hybridmodus; None = automatisch nach Art der Anfrage.
     rerank_blend: None = Reihenfolge ganz dem Reranker überlassen; sonst sein Gewicht beim Mischen mit
     der Reihenfolge der ersten Stufe (1.0 = beide gleich).
+    parse_filters: Angaben wie ``type:pdf in:Rechnungen after:2024`` aus der Anfrage lesen (filters.py).
     """
     resolved = resolve_mode(db, mode, embedder)
     if resolved in ("semantic", "hybrid") and embedder is None:
         raise ValueError(f"Modus '{resolved}' braucht einen Embedder")
 
-    types = [t.lower().lstrip(".") for t in filetypes] if filetypes else None
+    flt = flt or SearchFilter()
+    if parse_filters:
+        query, parsed = parse_query(query)
+        flt = merge_filters(flt, parsed)
+    flt = flt.with_types(filetypes)
     terms = query_terms(query)
     if not terms and not query.strip():
         return []
@@ -102,13 +113,17 @@ def search(
     keyword_ranked: list[tuple[int, float]] = []
     vector_ranked: list[tuple[int, float]] = []
     if resolved in ("keyword", "hybrid"):
-        keyword_ranked = keyword_ranking(db, terms, k=pool, filetypes=types)
-    if resolved in ("semantic", "hybrid"):
+        keyword_ranked = keyword_ranking(db, terms, k=pool, flt=flt)
+    if resolved in ("semantic", "hybrid") and query.strip():
         assert embedder is not None
         store = VectorStore(db)
         store.ensure(embedder)  # wirft bei Modellwechsel einen verständlichen Fehler
-        # Vektorsuche kennt keine Filter → mehr holen und danach filtern
-        hits = store.search(embedder.embed_query(query), k=pool * (4 if types else 1))
+        candidates = _filtered_chunk_ids(db, flt) if flt.active else None
+        if candidates is not None and len(candidates) > EXACT_FILTER_LIMIT:
+            # großer Teil des Index → global suchen, mehr holen und danach filtern
+            hits = store.search(embedder.embed_query(query), k=pool * 4)
+        else:
+            hits = store.search(embedder.embed_query(query), k=pool, candidates=candidates)
         vector_ranked = [(h.chunk_id, h.similarity) for h in hits]
 
     if resolved == "keyword":
@@ -120,8 +135,12 @@ def search(
         fused = rrf([[i for i, _ in keyword_ranked], [i for i, _ in vector_ranked]], weights=[weight, 1.0])
 
     rows = _fetch_chunks(db, [i for i, _ in fused])
-    if types:
-        fused = [(i, s) for i, s in fused if i in rows and rows[i]["filetype"] in types]
+    if flt.active:
+        fused = [
+            (i, s)
+            for i, s in fused
+            if i in rows and flt.matches(rows[i]["path"], rows[i]["filetype"], rows[i]["mtime"])
+        ]
     if reranker is not None and fused:
         fused = _rerank(reranker, query, fused, rows, rerank_depth, rerank_blend)
     kept: list[tuple[int, float, dict, frozenset[str], list[str]]] = []
@@ -166,6 +185,28 @@ def search(
             )
         )
     return results
+
+
+def merge_filters(a: SearchFilter, b: SearchFilter) -> SearchFilter:
+    def pick(x: float | None, y: float | None, fn) -> float | None:
+        return y if x is None else (x if y is None else fn(x, y))
+
+    return SearchFilter(
+        types=tuple(dict.fromkeys(a.types + b.types)),
+        include=a.include + b.include,
+        exclude=a.exclude + b.exclude,
+        after=pick(a.after, b.after, max),
+        before=pick(a.before, b.before, min),
+        errors=a.errors + b.errors,
+    )
+
+
+def _filtered_chunk_ids(db: Database, flt: SearchFilter) -> list[int]:
+    where, params = flt.sql("d")
+    rows = db.conn.execute(
+        f"SELECT c.id FROM chunks c JOIN documents d ON d.id = c.document_id WHERE 1{where}", params
+    )
+    return [int(r[0]) for r in rows]
 
 
 def _rerank(
@@ -218,7 +259,7 @@ def _fetch_chunks(db: Database, ids: list[int]) -> dict[int, dict]:
     for start in range(0, len(ids), 500):  # SQLite-Parameterlimit
         batch = ids[start : start + 500]
         rows = db.conn.execute(
-            "SELECT c.id, c.document_id, c.text, c.page, c.heading_path, d.path, d.filetype "
+            "SELECT c.id, c.document_id, c.text, c.page, c.heading_path, d.path, d.filetype, d.mtime "
             "FROM chunks c JOIN documents d ON d.id = c.document_id "
             f"WHERE c.id IN ({','.join('?' * len(batch))})",
             batch,

@@ -8,7 +8,7 @@ nach Kosinus-Ähnlichkeit (cos = 1 - d²/2).
 from __future__ import annotations
 
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import PureWindowsPath
 
@@ -137,9 +137,14 @@ class VectorStore:
             if progress:
                 progress(len(rows))
 
-    def search(self, query_vector: np.ndarray, k: int = 50) -> list[VectorHit]:
+    def search(
+        self, query_vector: np.ndarray, k: int = 50, *, candidates: Sequence[int] | None = None
+    ) -> list[VectorHit]:
+        """Nächste Nachbarn; mit ``candidates`` exakt nur unter diesen Abschnitten (für Filter)."""
         if not self.available:
             return []
+        if candidates is not None:
+            return self._search_candidates(query_vector, k, candidates)
         if _memory_enabled and str(self.db.path) != ":memory:":
             return self._search_in_memory(query_vector, k)
         rows = self.db.conn.execute(
@@ -200,15 +205,47 @@ class VectorStore:
 
     def _search_in_memory(self, query_vector: np.ndarray, k: int) -> list[VectorHit]:
         m = self._matrix()
-        if len(m.ids) == 0:
+        return _top_k(m.ids, m.vectors, query_vector, k)
+
+    def _search_candidates(
+        self, query_vector: np.ndarray, k: int, candidates: Sequence[int]
+    ) -> list[VectorHit]:
+        """Exakte Suche in einer Teilmenge. Filter wie ``in:Rechnungen`` träfen sonst oft nichts, weil
+        die passenden Abschnitte nicht unter den global nächsten Nachbarn sind."""
+        wanted = np.fromiter(candidates, dtype=np.int64)
+        if len(wanted) == 0:
             return []
-        sims = m.vectors @ np.asarray(query_vector, dtype=np.float32)
-        k = min(k, len(sims))
-        top = np.argpartition(-sims, k - 1)[:k]
-        top = top[np.argsort(-sims[top])]
-        # gleiche Distanz wie sqlite-vec (euklidisch auf normalisierten Vektoren)
-        dist = np.sqrt(np.clip(2.0 - 2.0 * sims[top], 0.0, None))
-        return [VectorHit(int(m.ids[i]), float(d)) for i, d in zip(top, dist, strict=True)]
+        if _memory_enabled and str(self.db.path) != ":memory:":
+            m = self._matrix()
+            mask = np.isin(m.ids, wanted)
+            return _top_k(m.ids[mask], m.vectors[mask], query_vector, k)
+        dim = int(self.db.get_meta("embedding_dim") or 0)
+        ids: list[int] = []
+        blobs: list[bytes] = []
+        for start in range(0, len(wanted), 500):  # SQLite-Parameterlimit
+            batch = [int(i) for i in wanted[start : start + 500]]
+            marks = ",".join("?" * len(batch))
+            for rowid, blob in self.db.conn.execute(
+                f"SELECT rowid, embedding FROM {self.TABLE} WHERE rowid IN ({marks})", batch
+            ):
+                ids.append(int(rowid))
+                blobs.append(blob)
+        if not ids:
+            return []
+        vectors = np.frombuffer(b"".join(blobs), dtype=np.float32).reshape(len(ids), dim)
+        return _top_k(np.asarray(ids, dtype=np.int64), vectors, query_vector, k)
+
+
+def _top_k(ids: np.ndarray, vectors: np.ndarray, query_vector: np.ndarray, k: int) -> list[VectorHit]:
+    if len(ids) == 0:
+        return []
+    sims = vectors @ np.asarray(query_vector, dtype=np.float32)
+    k = min(k, len(sims))
+    top = np.argpartition(-sims, k - 1)[:k]
+    top = top[np.argsort(-sims[top])]
+    # gleiche Distanz wie sqlite-vec (euklidisch auf normalisierten Vektoren)
+    dist = np.sqrt(np.clip(2.0 - 2.0 * sims[top], 0.0, None))
+    return [VectorHit(int(ids[i]), float(d)) for i, d in zip(top, dist, strict=True)]
 
 
 def _blob(vector: np.ndarray) -> bytes:

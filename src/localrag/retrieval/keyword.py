@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from localrag.index.db import Database
 from localrag.index.text_norm import iter_tokens, stem
+from localrag.retrieval.filters import SearchFilter
 
 
 @dataclass(frozen=True)
@@ -30,7 +31,12 @@ def build_match_query(terms: list[str]) -> str:
 
 
 def keyword_ranking(
-    db: Database, terms: list[str], *, k: int, filetypes: list[str] | None = None
+    db: Database,
+    terms: list[str],
+    *,
+    k: int,
+    filetypes: list[str] | None = None,
+    flt: SearchFilter | None = None,
 ) -> list[tuple[int, float]]:
     """(chunk_id, BM25-Score) absteigend nach Relevanz."""
     if not terms:
@@ -41,9 +47,10 @@ def keyword_ranking(
         "WHERE chunks_fts MATCH ?"
     )
     params: list[object] = [build_match_query(terms)]
-    if filetypes:
-        sql += f" AND d.filetype IN ({','.join('?' * len(filetypes))})"
-        params.extend(filetypes)
+    flt = (flt or SearchFilter()).with_types(filetypes)
+    where, where_params = flt.sql("d")
+    sql += where
+    params.extend(where_params)
     sql += " ORDER BY rank LIMIT ?"
     params.append(k)
     # FTS5-bm25 ist negativ: kleiner = besser → Vorzeichen drehen

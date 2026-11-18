@@ -3,6 +3,19 @@
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [Unreleased]
+
+### Neu
+- `localrag autostart --enable/--disable`: Dienst samt Watcher startet bei der Windows-Anmeldung unsichtbar.
+- Sprachmodell in der Konfiguration: `llm_url` und `llm_model` (Umgebungsvariablen haben Vorrang).
+- Quellcode als Format, nur mit `code = true`, aufgeteilt an Funktionen und Klassen.
+- Messung der Antwortqualität (`eval/run_answer_eval.py`) mit Prüfmodell, Zitat-Prüfung und Fallen-Fragen.
+
+### Geändert
+- Von Werkzeugen erzeugte HTML-Dokumentation (Sphinx, Doxygen, Javadoc …) wird übersprungen, `steamapps` ist
+  standardmäßig ausgeschlossen.
+- Präsentationen zeigen „Folie N“ statt „Seite N“.
+
 ## [0.2.0] – 2026-11-18
 
 Alltagstauglich: Filter, Konfiguration, automatische Aktualisierung, Web-Oberfläche, mehr Formate.

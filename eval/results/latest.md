@@ -1,24 +1,24 @@
 # Eval: Suchmodi im Vergleich
 
-Korpus: 16 synthetische Dokumente · 35 Fragen · Embedding-Modell: BAAI/bge-m3 (cuda) · Indexierung inkl. Vektoren: 0.5 s
+Korpus: 16 synthetische Dokumente · 40 Fragen · Embedding-Modell: BAAI/bge-m3 (cuda) · Indexierung inkl. Vektoren: 0.8 s
 
 | Modus | Fragen | n | Recall@1 | Recall@3 | Recall@5 | MRR | Latenz p50 |
 |---|---|---|---|---|---|---|---|
-| **keyword** | gesamt | 35 | 0.60 | 0.69 | 0.69 | 0.63 | 0.3 ms |
-|  | disambiguation | 5 | 0.20 | 0.80 | 0.80 | 0.43 | 0.4 ms |
+| **keyword** | gesamt | 40 | 0.62 | 0.72 | 0.72 | 0.67 | 0.4 ms |
+|  | disambiguation | 10 | 0.50 | 0.90 | 0.90 | 0.67 | 0.5 ms |
 |  | exact-id | 5 | 1.00 | 1.00 | 1.00 | 1.00 | 0.4 ms |
-|  | keyword | 12 | 1.00 | 1.00 | 1.00 | 1.00 | 0.2 ms |
+|  | keyword | 12 | 1.00 | 1.00 | 1.00 | 1.00 | 0.3 ms |
 |  | paraphrase | 13 | 0.23 | 0.23 | 0.23 | 0.23 | 0.3 ms |
-| **semantic** | gesamt | 35 | 0.89 | 1.00 | 1.00 | 0.94 | 22.7 ms |
-|  | disambiguation | 5 | 1.00 | 1.00 | 1.00 | 1.00 | 22.5 ms |
-|  | exact-id | 5 | 0.40 | 1.00 | 1.00 | 0.67 | 21.8 ms |
-|  | keyword | 12 | 1.00 | 1.00 | 1.00 | 1.00 | 23.1 ms |
-|  | paraphrase | 13 | 0.92 | 1.00 | 1.00 | 0.96 | 22.3 ms |
-| **hybrid** | gesamt | 35 | 0.83 | 1.00 | 1.00 | 0.90 | 22.1 ms |
-|  | disambiguation | 5 | 0.60 | 1.00 | 1.00 | 0.77 | 22.1 ms |
-|  | exact-id | 5 | 1.00 | 1.00 | 1.00 | 1.00 | 21.9 ms |
-|  | keyword | 12 | 1.00 | 1.00 | 1.00 | 1.00 | 22.2 ms |
-|  | paraphrase | 13 | 0.69 | 1.00 | 1.00 | 0.83 | 22.1 ms |
+| **semantic** | gesamt | 40 | 0.88 | 1.00 | 1.00 | 0.93 | 27.6 ms |
+|  | disambiguation | 10 | 0.90 | 1.00 | 1.00 | 0.95 | 26.8 ms |
+|  | exact-id | 5 | 0.40 | 1.00 | 1.00 | 0.67 | 27.3 ms |
+|  | keyword | 12 | 1.00 | 1.00 | 1.00 | 1.00 | 28.2 ms |
+|  | paraphrase | 13 | 0.92 | 1.00 | 1.00 | 0.96 | 28.5 ms |
+| **hybrid** | gesamt | 40 | 0.82 | 1.00 | 1.00 | 0.90 | 27.6 ms |
+|  | disambiguation | 10 | 0.70 | 1.00 | 1.00 | 0.83 | 27.6 ms |
+|  | exact-id | 5 | 1.00 | 1.00 | 1.00 | 1.00 | 27.5 ms |
+|  | keyword | 12 | 1.00 | 1.00 | 1.00 | 1.00 | 28.2 ms |
+|  | paraphrase | 13 | 0.69 | 1.00 | 1.00 | 0.83 | 27.5 ms |
 
 ## Rang der richtigen Datei pro Frage
 
@@ -59,3 +59,8 @@ Korpus: 16 synthetische Dokumente · 35 Fragen · Embedding-Modell: BAAI/bge-m3 
 | exact-id | WTEST-998877 | fahrrad_kaufbeleg.md | 1 | 2 | 1 |
 | paraphrase | Darf ich Benzinkanister in der Garage lagern? | garagenmietvertrag.md | 1 | 1 | 1 |
 | disambiguation | Gab es 2023 eine Rückzahlung vom Stromanbieter? | stromrechnung_2023.md | 2 | 1 | 1 |
+| disambiguation | Wie hoch war der Grundpreis beim Strom 2023? | stromrechnung_2023.md | 1 | 1 | 1 |
+| disambiguation | Arbeitspreis Strom 2024 | stromrechnung_2024.md | 1 | 1 | 1 |
+| disambiguation | Welcher Abschlag galt ab März 2024? | stromrechnung_2023.md | 2 | 2 | 2 |
+| disambiguation | Was stand im Arbeitsvertrag von 2019 zur Arbeitszeit? | alter_arbeitsvertrag_2019.md | 1 | 1 | 1 |
+| disambiguation | Wie viel habe ich 2024 für Strom bezahlt? | stromrechnung_2024.md | 1 | 1 | 1 |

@@ -132,3 +132,21 @@ def test_autostart_script_escapes_quotes():
     script = autostart_script(r"C:\Program Files\py\python.exe", Path(r"C:\x\serve.log"), {"A": 'x"y'})
     assert '("A") = "x""y"' in script
     assert r'""C:\Program Files\py\python.exe""' in script
+
+
+def test_llm_server_from_config_with_env_taking_precedence(tmp_path: Path, monkeypatch):
+    from localrag.generation.llm import ChatClient
+
+    cfg = write(
+        tmp_path / "c.toml", 'llm_url = "http://127.0.0.1:8000/v1"\nllm_model = "engine/candidate-7"\n'
+    )
+    monkeypatch.setenv("LOCALRAG_CONFIG", str(cfg))
+    monkeypatch.delenv("LOCALRAG_LLM_URL", raising=False)
+    monkeypatch.delenv("LOCALRAG_LLM_MODEL", raising=False)
+    with ChatClient() as c:
+        assert c.base_url == "http://127.0.0.1:8000/v1" and c.model == "engine/candidate-7"
+    with ChatClient("http://anderer:1234/v1") as c:  # ausdrücklicher Server → Modell nicht übernehmen
+        assert c._model is None
+    monkeypatch.setenv("LOCALRAG_LLM_URL", "http://env:9/v1")
+    with ChatClient() as c:
+        assert c.base_url == "http://env:9/v1"

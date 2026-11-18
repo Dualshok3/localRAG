@@ -75,6 +75,10 @@ code = false
 # Größere Dateien überspringen (MB)
 max_file_mb = 50
 
+# Sprachmodell für `localrag ask` (OpenAI-kompatibel; Standard: LM Studio auf Port 1234)
+# llm_url = "http://127.0.0.1:1234/v1"
+# llm_model = "gemma-4-26b-a4b-it"
+
 # Index-Datenbank (sonst ~/.localrag/localrag.db oder LOCALRAG_DB)
 # db = "D:/localrag/index.db"
 """
@@ -92,6 +96,8 @@ class Config:
     max_file_mb: float = DEFAULT_MAX_FILE_MB
     db: Path | None = None
     code: bool = False  # Quellcode (.py, .js, …) mitindexieren
+    llm_url: str | None = None  # OpenAI-kompatibler Server für `ask`
+    llm_model: str | None = None
     source: Path | None = field(default=None, compare=False)
 
     def extensions(self) -> frozenset[str]:
@@ -121,7 +127,7 @@ def load_config(path: Path | None = None) -> Config:
     except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError) as exc:
         raise ConfigError(f"Konfiguration {path} nicht lesbar: {exc}") from exc
 
-    known = {"folders", "exclude", "default_excludes", "max_file_mb", "db", "code"}
+    known = {"folders", "exclude", "default_excludes", "max_file_mb", "db", "code", "llm_url", "llm_model"}
     unknown = set(data) - known
     if unknown:
         raise ConfigError(f"Unbekannte Einträge in {path}: {', '.join(sorted(unknown))}")
@@ -138,6 +144,9 @@ def load_config(path: Path | None = None) -> Config:
     db = data.get("db")
     if db is not None and not isinstance(db, str):
         raise ConfigError(f"db in {path} muss ein Pfad (Text) sein")
+    for key in ("llm_url", "llm_model"):
+        if data.get(key) is not None and not isinstance(data[key], str):
+            raise ConfigError(f"{key} in {path} muss ein Text sein")
     return Config(
         folders=tuple(Path(f).expanduser() for f in str_list("folders")),
         exclude=tuple(str_list("exclude")),
@@ -145,6 +154,8 @@ def load_config(path: Path | None = None) -> Config:
         max_file_mb=float(max_mb),
         db=Path(db).expanduser() if db else None,
         code=bool(data.get("code", False)),
+        llm_url=data.get("llm_url"),
+        llm_model=data.get("llm_model"),
         source=path,
     )
 

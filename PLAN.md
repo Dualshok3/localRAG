@@ -268,7 +268,7 @@ RAG/
 ### Phase 2 – Antworten generieren (3–4 Tage)
 - [x] LM-Studio-Anbindung (OpenAI-kompatibel, Streaming, `<think>`-Filter), Prompt mit nummerierten Quellen `[1] [2]`
 - [x] `localrag ask "<frage>"` mit Streaming-Ausgabe und Zitaten
-- [ ] Antwortqualität messen (systematisch in Phase 3). Stichprobe mit 4 Fragen: Qwen3.5-9B 3/4, die Haustier-Ausnahme wird falsch auf die Katze angewendet, ein Prompt-Hinweis hilft nicht. Gemma 4 26B-A4B 4/4. Beide brauchen ~3 s, ~2,5 s davon bis zum ersten Token. Die früheren 8–56 s ließen sich im Eval-Korpus nicht reproduzieren, vermutlich Kaltstart
+- [x] Antwortqualität messen *(eval/run_answer_eval.py: 20 Fragen + 5 Fallen, LLM-as-Judge. Gemma 4 26B 20/20, crit-Engine 18/20, Qwen3.5-9B 17/20 und erfindet bei einer Falle eine Antwort)*
 - [x] „Ich weiß es nicht“-Verhalten, wenn nichts Relevantes gefunden wird *(fester Satz im Prompt, CLI erkennt ihn)*
 
 **Ergebnis:** Echter RAG – Frage rein, Antwort mit Quellen raus.
@@ -276,7 +276,7 @@ RAG/
 ### Phase 3 – Qualität messen & verbessern (1 Woche) ⭐ *das Portfolio-Herzstück*
 - [ ] **Eval-Set**: 50–100 Fragen mit bekannter Quelldatei (teils per LLM generiert, manuell geprüft)
   *(Zwischenstand: 16 Dokumente, 35 Fragen inkl. Fallen mit ähnlichen Dokumenten. Recall@1: BM25 0,60 · Vektor 0,89 · Hybrid 0,83. Gleich gewichtetes RRF kostet bei Umschreibungen Platz 1, daher als Nächstes Reranker bzw. gewichtetes RRF testen)*
-- [ ] Metriken: **Recall@5, Recall@10, MRR**, Latenz p50/p95; für Antworten: Faithfulness (LLM-as-Judge)
+- [x] Metriken: **Recall@k, MRR**, Latenz p50; für Antworten: richtig, belegt (Faithfulness), Zitat, „weiß ich nicht“ (LLM-as-Judge)
 - [ ] Experimente, jeweils mit Zahlen im README:
   1. nur Vektor vs. nur BM25 vs. **Hybrid (RRF)**
   2. ohne vs. **mit Reranker** ✅ *(echte Dateien, 78 Fragen: Recall@1 0,71 → 0,76, MRR 0,79 → 0,84, +0,33 s pro Suche → optional per `--rerank`. Mischen mit der ersten Stufe getestet: kleiner Index gleichauf, ganze Laufwerke schlechter → Ersetzen bleibt)*
@@ -284,6 +284,7 @@ RAG/
   3. Chunkgrößen 256 / 512 / 1024
   4. mit vs. ohne `heading_path`-Kontext
   5. Embedding-Modelle im Vergleich
+  7. Jahreszahl-Bonus ✗ *(getestet auf 40 synthetischen + 78 echten Fragen: keine Änderung, bge-m3 trifft Jahre schon selbst → verworfen)*
 - [x] **Benchmark gegen Windows-Suche** auf denselben Fragen (Wie oft ist die richtige Datei in den Top 5?)
   *(echte Dateien, 24 Fragen: Hybrid Recall@5 0,96 gegenüber Windows-Suche 0,25. Die Windows-Suche kennt D: nicht und scheitert an ganzen Sätzen. Aus dem Test umgesetzt: OCR für Scans, Duplikate zusammenfassen, DOCX-Notfallparser. Dazu ein zweites Set mit 12 Fragen ohne gemeinsame Wörter: dort Vektor 0,67 vor Hybrid 0,42. Inzwischen 78 echte Fragen. Offen: Kürzel-Dokumente, Mails aus fast nur Platzhaltern)*
 
@@ -292,6 +293,8 @@ RAG/
 
 ### Phase 4 – Alltagstauglich (1–2 Wochen)
 - [x] Inkrementelle Indexierung (Manifest mit Hash/mtime), gelöschte Dateien entfernen
+- [x] Konfiguration mit Ausschlüssen auf dem echten Rechner: 381 Dateien, Recall@1/@5 mit Reranker 0,74 / 0,94 (bester Wert)
+- [x] Autostart `localrag autostart --enable` (Dienst + Watcher bei der Anmeldung)
 - [x] Test über ganze Laufwerke (8.771 Dateien, 57.498 Abschnitte) *(behoben: Junctions, UTF-16, Wort-/Datenlisten, Vektoren im Arbeitsspeicher für Dienst/MCP, schnelles Laden aus sqlite-vec-Blöcken)*
 - [x] watchdog-Watcher als Hintergrunddienst *(`localrag watch` oder `serve --watch`, Ereignisse 2 s gesammelt, Abgleich beim Start)*
 - [x] Weitere Formate: XLSX, PPTX, HTML, CSV, E-Mails (.eml/.msg mit Anhängen) *(offen: Quellcode)*

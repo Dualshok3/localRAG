@@ -1,0 +1,1502 @@
+[
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Wie lange ist die Kündigungsfrist für meine Wohnung?",
+  "qtype": "fact",
+  "answer": "Die Kündigungsfrist für dich als Mieterin beträgt drei Monate zum Monatsende [1]. Die Kündigung muss schriftlich erfolgen [1].",
+  "seconds": 3.321261199991568,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die Kernaussage korrekt und gibt das optionale Detail wahrheitsgetreu wieder. Alle Informationen sind durch Quelle [1] belegt.",
+  "sources": [
+   "mietvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "mietvertrag.md",
+   "mietvertrag.md",
+   "nebenkostenabrechnung_2023.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Wie hoch ist die Kaution für die Wohnung?",
+  "qtype": "fact",
+  "answer": "Die Mietsicherheit (Kaution) beträgt 2.100,00 EUR und kann in drei Raten gezahlt werden [1].",
+  "seconds": 2.8768158000020776,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (2.100 EUR) und die optionalen Details korrekt gemäß Quelle [1].",
+  "sources": [
+   "mietvertrag.md",
+   "hausratversicherung.md",
+   "mietvertrag.md",
+   "nebenkostenabrechnung_2023.md",
+   "mietvertrag.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Darf ich eine Katze halten?",
+  "qtype": "condition",
+  "answer": "Die Haltung von Haustieren bedarf der vorherigen Zustimmung des Vermieters, ausgenommen es handelt sich um Kleintiere in Käfigen [2].",
+  "seconds": 2.8788238000124693,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die vollständige Kernaussage (Zustimmung des Vermieters erforderlich, Kleintiere in Käfigen sind die Ausnahme) und ist durch Quelle [2] vollständig belegt.",
+  "sources": [
+   "garagenmietvertrag.md",
+   "mietvertrag.md",
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "garagenmietvertrag.md",
+   "kfz_versicherung.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Wie viel Strom habe ich 2023 verbraucht?",
+  "qtype": "disambiguation",
+  "answer": "Du hast im Jahr 2023 einen Verbrauch von 2.610 kWh [1].",
+  "seconds": 3.039537399992696,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (2.610 kWh) und diese ist durch Quelle [1] eindeutig belegt.",
+  "sources": [
+   "stromrechnung_2023.md",
+   "nebenkostenabrechnung_2023.md",
+   "stromrechnung_2024.md",
+   "fahrrad_kaufbeleg.md",
+   "alter_arbeitsvertrag_2019.md",
+   "handyvertrag.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Wie viel Strom habe ich 2024 verbraucht?",
+  "qtype": "disambiguation",
+  "answer": "Du hast im Jahr 2024 einen Verbrauch von 2.340 kWh [1].",
+  "seconds": 3.0505392999912146,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (2.340 kWh) und ist durch die Quelle [1] vollständig belegt.",
+  "sources": [
+   "stromrechnung_2024.md",
+   "stromrechnung_2023.md",
+   "nebenkostenabrechnung_2023.md",
+   "handyvertrag.md",
+   "laptop_kaufbeleg.md",
+   "zahnarzt_rechnung.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Wie hoch ist mein aktueller monatlicher Stromabschlag?",
+  "qtype": "disambiguation",
+  "answer": "Dein neuer monatlicher Abschlag ab März 2025 beträgt 70,00 EUR [3].",
+  "seconds": 3.0195965000020806,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (70 EUR) und die korrekten optionalen Details (ab März 2025) gemäß Quelle [3].",
+  "sources": [
+   "handyvertrag.md",
+   "stromrechnung_2023.md",
+   "stromrechnung_2024.md",
+   "arbeitsvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Musste ich für 2023 beim Strom nachzahlen?",
+  "qtype": "disambiguation",
+  "answer": "Nein, du hast für 2023 beim Strom ein Guthaben von 41,52 EUR [2].",
+  "seconds": 3.124539600001299,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die Kernaussage korrekt und vollständig und ist durch Quelle [2] belegt.",
+  "sources": [
+   "nebenkostenabrechnung_2023.md",
+   "stromrechnung_2023.md",
+   "stromrechnung_2024.md",
+   "fahrrad_kaufbeleg.md",
+   "handyvertrag.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Wie hoch ist die Selbstbeteiligung in der Vollkasko?",
+  "qtype": "fact",
+  "answer": "Die Selbstbeteiligung in der Vollkasko beträgt 300 EUR je Schadensfall [1].",
+  "seconds": 2.8307540000096196,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort gibt die Kernaussage korrekt wieder und ist vollständig durch Quelle [1] gedeckt.",
+  "sources": [
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "hausratversicherung.md",
+   "hausratversicherung.md",
+   "hausratversicherung.md",
+   "fahrrad_kaufbeleg.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Wie viele Urlaubstage habe ich im aktuellen Job?",
+  "qtype": "disambiguation",
+  "answer": "Du erhältst 30 Urlaubstage pro Kalenderjahr [2].",
+  "seconds": 2.666893000001437,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (30 Tage) und ist durch die Quelle [2] eindeutig belegt. Der alte Vertrag [1] wird ignoriert, da die Frage nach dem 'aktuellen' Job gestellt wurde.",
+  "sources": [
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md",
+   "arbeitsvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md",
+   "arbeitsvertrag.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Wie viele Urlaubstage hatte ich beim alten Arbeitgeber?",
+  "qtype": "disambiguation",
+  "answer": "Du hattest 26 Urlaubstage pro Kalenderjahr [1].",
+  "seconds": 2.5843308999901637,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Kernaussage (26 Urlaubstage) ist korrekt wiedergegeben und durch Quelle [1] belegt. Das Fehlen des Arbeitgebernamens ist gemäß den Regeln zulässig.",
+  "sources": [
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "alter_arbeitsvertrag_2019.md",
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Wie viel verdiene ich aktuell brutto?",
+  "qtype": "disambiguation",
+  "answer": "Dein Bruttogehalt beträgt 4.200 EUR monatlich [3].",
+  "seconds": 2.7552085000061197,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort gibt die Kernaussage korrekt wieder und ist durch die Quelle [3] (Arbeitsvertrag) vollständig belegt.",
+  "sources": [
+   "stromrechnung_2024.md",
+   "stromrechnung_2023.md",
+   "arbeitsvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "zahnarzt_rechnung.md",
+   "hausratversicherung.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Bis wann habe ich Garantie auf meinen Laptop?",
+  "qtype": "reasoning",
+  "answer": "Du hast eine Herstellergarantie von 24 Monaten ab dem Kaufdatum (12.03.2024) [1].",
+  "seconds": 3.1600483000074746,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die vollständige Kernaussage (24 Monate ab dem Kaufdatum 12.03.2024) und ist durch Quelle [1] vollständig belegt.",
+  "sources": [
+   "laptop_kaufbeleg.md",
+   "fahrrad_kaufbeleg.md",
+   "handyvertrag.md",
+   "router_manual.md",
+   "stromrechnung_2024.md",
+   "stromrechnung_2023.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Ist mein Fahrrad versichert, wenn es gestohlen wird?",
+  "qtype": "condition",
+  "answer": "Fahrraddiebstahl ist bis 1.000 EUR mitversichert, sofern das Fahrrad abgeschlossen war [1].",
+  "seconds": 2.8409805999981472,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die vollständige Kernaussage (Versicherungsschutz bis 1.000 EUR bei Abschluss/Abschließen) und ist vollständig durch Quelle [1] gedeckt.",
+  "sources": [
+   "hausratversicherung.md",
+   "fahrrad_kaufbeleg.md",
+   "hausratversicherung.md",
+   "garagenmietvertrag.md",
+   "kfz_versicherung.md",
+   "kfz_versicherung.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Darf ich Benzinkanister in der Garage lagern?",
+  "qtype": "reasoning",
+  "answer": "Nein, die Lagerung von brennbaren Flüssigkeiten ist untersagt [1].",
+  "seconds": 2.6957914999948116,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die Kernaussage korrekt und ist durch Quelle [1] vollständig belegt.",
+  "sources": [
+   "garagenmietvertrag.md",
+   "garagenmietvertrag.md",
+   "garagenmietvertrag.md",
+   "garagenmietvertrag.md",
+   "kfz_versicherung.md",
+   "hausratversicherung.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Wie viel erstattet die Krankenkasse für die Zahnreinigung?",
+  "qtype": "fact",
+  "answer": "Die Krankenkasse erstattet laut Bonusprogramm 40,00 EUR [1].",
+  "seconds": 2.7697673000075156,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (40 EUR) und ist vollständig durch Quelle [1] belegt. Das Weglassen der Rechnungshöhe ist gemäß den Regeln zulässig.",
+  "sources": [
+   "zahnarzt_rechnung.md",
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "nebenkostenabrechnung_2023.md",
+   "hausratversicherung.md",
+   "hausratversicherung.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Wie hoch war die Nachzahlung bei den Nebenkosten 2023?",
+  "qtype": "fact",
+  "answer": "Die Nachzahlung bei den Nebenkosten 2023 betrug 146 EUR und ist bis zum 30.06.2024 fällig [1].",
+  "seconds": 3.2747836999915307,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (146 EUR) und das korrekte optionale Detail (Fälligkeit 30.06.2024) gemäß Quelle [1].",
+  "sources": [
+   "nebenkostenabrechnung_2023.md",
+   "stromrechnung_2023.md",
+   "mietvertrag.md",
+   "stromrechnung_2024.md",
+   "fahrrad_kaufbeleg.md",
+   "garagenmietvertrag.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Wie setze ich den Router zurück?",
+  "qtype": "fact",
+  "answer": "Um die Werkseinstellungen wiederherzustellen, drücke und halte den Reset-Knopf auf der Rückseite für 10 Sekunden, bis die Power-LED blinkt [1].",
+  "seconds": 2.8897716000064975,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die vollständige Kernaussage und die optionalen Details korrekt gemäß Quelle [1].",
+  "sources": [
+   "router_manual.md",
+   "router_manual.md",
+   "router_manual.md",
+   "handyvertrag.md",
+   "garagenmietvertrag.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "In welchem Hotel übernachten wir in Florenz?",
+  "qtype": "fact",
+  "answer": "Du übernachtest im Hotel Bellavista in Florenz [1].",
+  "seconds": 2.6496517000050517,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die Kernaussage (Hotel Bellavista) korrekt und lässt die optionalen Details (Datum, Zimmerart) zulässigerweise weg. Alle Informationen sind durch Quelle [1] belegt.",
+  "sources": [
+   "italien_reise.md",
+   "italien_reise.md",
+   "kfz_versicherung.md",
+   "lasagne_rezept.md",
+   "kfz_versicherung.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Wie viel Datenvolumen hat mein Handyvertrag?",
+  "qtype": "fact",
+  "answer": "Dein Handyvertrag hat 20 GB Datenvolumen pro Monat mit 5G [1].",
+  "seconds": 2.933529299989459,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die Kernaussage (20 GB pro Monat) sowie das optionale Detail (5G) korrekt und deckt sich vollständig mit Quelle [1].",
+  "sources": [
+   "handyvertrag.md",
+   "kfz_versicherung.md",
+   "stromrechnung_2023.md",
+   "stromrechnung_2024.md",
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Wie lange muss ich die Lasagne backen?",
+  "qtype": "fact",
+  "answer": "Du musst die Lasagne bei 180 °C für 40 Minuten backen [1].",
+  "seconds": 2.8106448000035016,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (40 Minuten bei 180 °C) und ist durch Quelle [1] vollständig belegt.",
+  "sources": [
+   "lasagne_rezept.md",
+   "lasagne_rezept.md",
+   "router_manual.md",
+   "arbeitsvertrag.md",
+   "italien_reise.md",
+   "laptop_kaufbeleg.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Wie hoch ist meine Rentenversicherungsnummer?",
+  "qtype": "unanswerable",
+  "answer": "Dazu habe ich in deinen Dateien nichts gefunden.",
+  "seconds": 2.5749387000105344,
+  "abstained": true,
+  "cites_source": null,
+  "correct": null,
+  "grounded": null,
+  "reason": "",
+  "sources": [
+   "hausratversicherung.md",
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "hausratversicherung.md",
+   "kfz_versicherung.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Wann läuft mein Reisepass ab?",
+  "qtype": "unanswerable",
+  "answer": "Dazu habe ich in deinen Dateien nichts gefunden.",
+  "seconds": 2.591894899989711,
+  "abstained": true,
+  "cites_source": null,
+  "correct": null,
+  "grounded": null,
+  "reason": "",
+  "sources": [
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md",
+   "handyvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Wie hoch ist die Kündigungsfrist meines Fitnessstudios?",
+  "qtype": "unanswerable",
+  "answer": "Dazu habe ich in deinen Dateien nichts gefunden.",
+  "seconds": 2.604537999999593,
+  "abstained": true,
+  "cites_source": null,
+  "correct": null,
+  "grounded": null,
+  "reason": "",
+  "sources": [
+   "mietvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "garagenmietvertrag.md",
+   "handyvertrag.md",
+   "arbeitsvertrag.md",
+   "alter_arbeitsvertrag_2019.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Welche Farbe hat mein Auto?",
+  "qtype": "unanswerable",
+  "answer": "Dazu habe ich in deinen Dateien nichts gefunden.",
+  "seconds": 2.6730296000023372,
+  "abstained": true,
+  "cites_source": null,
+  "correct": null,
+  "grounded": null,
+  "reason": "",
+  "sources": [
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "garagenmietvertrag.md",
+   "fahrrad_kaufbeleg.md",
+   "laptop_kaufbeleg.md"
+  ]
+ },
+ {
+  "model": "gemma-4-26b-a4b-it",
+  "question": "Welche Schadenfreiheitsklasse habe ich in der Teilkasko?",
+  "qtype": "unanswerable",
+  "answer": "Dazu habe ich in deinen Dateien nichts gefunden.",
+  "seconds": 2.691563700005645,
+  "abstained": true,
+  "cites_source": null,
+  "correct": null,
+  "grounded": null,
+  "reason": "",
+  "sources": [
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "fahrrad_kaufbeleg.md",
+   "hausratversicherung.md",
+   "laptop_kaufbeleg.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Wie lange ist die Kündigungsfrist für meine Wohnung?",
+  "qtype": "fact",
+  "answer": "Die Kündigungsfrist für deine Wohnung beträgt drei Monate zum Monatsende [1].",
+  "seconds": 2.958424800002831,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Kernaussage wurde korrekt wiedergegeben und die Antwort widerspricht keinen Informationen aus den Quellen. Das optionale Detail zur Schriftform wurde weggelassen, was laut Anweisung zulässig ist.",
+  "sources": [
+   "mietvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "mietvertrag.md",
+   "mietvertrag.md",
+   "nebenkostenabrechnung_2023.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Wie hoch ist die Kaution für die Wohnung?",
+  "qtype": "fact",
+  "answer": "Die Kaution für die Wohnung beträgt 2.100,00 EUR [1].",
+  "seconds": 2.8449187999940477,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Kernaussage (2.100 EUR) ist korrekt wiedergegeben und die Antwort widerspricht nicht den Quellen. Das Fehlen der optionalen Information zur Ratenzahlung ist gemäß den Vorgaben zulässig.",
+  "sources": [
+   "mietvertrag.md",
+   "hausratversicherung.md",
+   "mietvertrag.md",
+   "nebenkostenabrechnung_2023.md",
+   "mietvertrag.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Darf ich eine Katze halten?",
+  "qtype": "condition",
+  "answer": "Ja, du darfst eine Katze halten, da Katzen als Kleintiere gelten und die Haltung von Kleintieren in Käfigen ausgenommen ist [2]. Die vorherige Zustimmung des Vermieters wird für diese Ausnahme nicht benötigt.",
+  "seconds": 3.3501481999992393,
+  "abstained": false,
+  "cites_source": true,
+  "correct": false,
+  "grounded": false,
+  "reason": "Die Antwort widerspricht der Kernaussage, da sie behauptet, Katzen seien Kleintiere in Käfigen und bräuchten keine Zustimmung, während die Quelle explizit besagt, dass Katzen (da keine Kleintiere in Käfigen) die Zustimmung benötigen.",
+  "sources": [
+   "garagenmietvertrag.md",
+   "mietvertrag.md",
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "garagenmietvertrag.md",
+   "kfz_versicherung.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Wie viel Strom habe ich 2023 verbraucht?",
+  "qtype": "disambiguation",
+  "answer": "Du hast im Jahr 2023 einen Stromverbrauch von 2.610 kWh [1].",
+  "seconds": 2.9668270999973174,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (2.610 kWh) und diese ist durch Quelle [1] eindeutig belegt.",
+  "sources": [
+   "stromrechnung_2023.md",
+   "nebenkostenabrechnung_2023.md",
+   "stromrechnung_2024.md",
+   "fahrrad_kaufbeleg.md",
+   "alter_arbeitsvertrag_2019.md",
+   "handyvertrag.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Wie viel Strom habe ich 2024 verbraucht?",
+  "qtype": "disambiguation",
+  "answer": "Du hast im Jahr 2024 einen Stromverbrauch von 2.340 kWh [1].",
+  "seconds": 2.9878587999992305,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (2.340 kWh) und ist durch die Quelle [1] vollständig belegt.",
+  "sources": [
+   "stromrechnung_2024.md",
+   "stromrechnung_2023.md",
+   "nebenkostenabrechnung_2023.md",
+   "handyvertrag.md",
+   "laptop_kaufbeleg.md",
+   "zahnarzt_rechnung.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Wie hoch ist mein aktueller monatlicher Stromabschlag?",
+  "qtype": "disambiguation",
+  "answer": "Dein aktueller monatlicher Stromabschlag beträgt ab März 2025 70,00 EUR [3].",
+  "seconds": 3.024493500008248,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (70 EUR) und die korrekten optionalen Details (ab März 2025) gemäß Quelle [3].",
+  "sources": [
+   "handyvertrag.md",
+   "stromrechnung_2023.md",
+   "stromrechnung_2024.md",
+   "arbeitsvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Musste ich für 2023 beim Strom nachzahlen?",
+  "qtype": "disambiguation",
+  "answer": "Ja, du musstest für das Jahr 2023 beim Strom nachzahlen. Der Gesamtbetrag betrug 1.098,48 EUR, während die geleisteten Abschläge 1.140,00 EUR betrugen, was zu einem Guthaben von 41,52 EUR führte [2]. Eine Nachzahlung war also nicht erforderlich; stattdessen entstand ein Guthaben.",
+  "seconds": 4.399405999996816,
+  "abstained": false,
+  "cites_source": true,
+  "correct": false,
+  "grounded": true,
+  "reason": "Die Antwort ist in sich widersprüchlich: Sie beginnt mit 'Ja, du musstest nachzahlen', stellt dann aber im selben Satz und im Folgesatz klar, dass ein Guthaben bestand und keine Nachzahlung erforderlich war. Da die Kernaussage 'Nein' lautet, ist die Antwort aufgrund des ersten Satzes inhaltlich falsch.",
+  "sources": [
+   "nebenkostenabrechnung_2023.md",
+   "stromrechnung_2023.md",
+   "stromrechnung_2024.md",
+   "fahrrad_kaufbeleg.md",
+   "handyvertrag.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Wie hoch ist die Selbstbeteiligung in der Vollkasko?",
+  "qtype": "fact",
+  "answer": "Die Selbstbeteiligung in der Vollkasko beträgt 300 EUR je Schadensfall [1].",
+  "seconds": 2.899886200000765,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort gibt die Kernaussage korrekt wieder und ist vollständig durch Quelle [1] gedeckt.",
+  "sources": [
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "hausratversicherung.md",
+   "hausratversicherung.md",
+   "hausratversicherung.md",
+   "fahrrad_kaufbeleg.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Wie viele Urlaubstage habe ich im aktuellen Job?",
+  "qtype": "disambiguation",
+  "answer": "Im aktuellen Job erhältst du 30 Urlaubstage pro Kalenderjahr [2].",
+  "seconds": 2.7196136999991722,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage und ist durch die Quelle [2] (aktueller Arbeitsvertrag) eindeutig belegt.",
+  "sources": [
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md",
+   "arbeitsvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md",
+   "arbeitsvertrag.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Wie viele Urlaubstage hatte ich beim alten Arbeitgeber?",
+  "qtype": "disambiguation",
+  "answer": "Beim alten Arbeitgeber, der Alt Consulting AG [4], hattest du 26 Urlaubstage pro Kalenderjahr [1].",
+  "seconds": 2.884497100007138,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Anzahl der Urlaubstage (26) und nennt den korrekten alten Arbeitgeber, wie in den Quellen [1] und [4] belegt.",
+  "sources": [
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "alter_arbeitsvertrag_2019.md",
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Wie viel verdiene ich aktuell brutto?",
+  "qtype": "disambiguation",
+  "answer": "Du verdienst aktuell ein Bruttogehalt von 4.200 EUR monatlich [3].",
+  "seconds": 2.8212771999969846,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (4.200 EUR brutto monatlich) und ist durch die Quelle [3] (Arbeitsvertrag) eindeutig belegt.",
+  "sources": [
+   "stromrechnung_2024.md",
+   "stromrechnung_2023.md",
+   "arbeitsvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "zahnarzt_rechnung.md",
+   "hausratversicherung.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Bis wann habe ich Garantie auf meinen Laptop?",
+  "qtype": "reasoning",
+  "answer": "Du hast eine Herstellergarantie von 24 Monaten ab dem Kaufdatum des Laptops am 12.03.2024 [1]. Das bedeutet, die Garantie gilt bis zum **12.09.2025**.",
+  "seconds": 3.6069075999985216,
+  "abstained": false,
+  "cites_source": true,
+  "correct": false,
+  "grounded": true,
+  "reason": "Die Antwort enthält ein falsches Enddatum (12.09.2025 statt März 2026), wodurch die Kernaussage nicht erfüllt wird.",
+  "sources": [
+   "laptop_kaufbeleg.md",
+   "fahrrad_kaufbeleg.md",
+   "handyvertrag.md",
+   "router_manual.md",
+   "stromrechnung_2024.md",
+   "stromrechnung_2023.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Ist mein Fahrrad versichert, wenn es gestohlen wird?",
+  "qtype": "condition",
+  "answer": "Ja, dein Fahrrad ist bis zu einem Betrag von 1.000 EUR mitversichert, sofern es abgeschlossen war [1]. Da das Kaufdatum deines Fahrrads der 03.06.2023 ist und du es in einer Garage abstellst, die nur zum Abstellen von Fahrzeugen und Fahrrädern genutzt werden darf [4], gilt diese Bedingung für den Versicherungsschutz.",
+  "seconds": 4.253931500003091,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die vollständige Kernaussage (Versicherung bis 1.000 EUR bei Abschluss) und alle Informationen sind durch die Quellen belegt. Die zusätzliche Erwähnung der Garage ist zwar für die Beantwortung der Kernfrage nicht zwingend notwendig, aber inhaltlich korrekt aus Quelle [4] abgeleitet.",
+  "sources": [
+   "hausratversicherung.md",
+   "fahrrad_kaufbeleg.md",
+   "hausratversicherung.md",
+   "garagenmietvertrag.md",
+   "kfz_versicherung.md",
+   "kfz_versicherung.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Darf ich Benzinkanister in der Garage lagern?",
+  "qtype": "reasoning",
+  "answer": "Nein, du darfst keine Benzinkanister in der Garage lagern. Die Lagerung von brennbaren Flüssigkeiten ist untersagt [1].",
+  "seconds": 3.0462976999988314,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die Kernaussage korrekt und alle Informationen sind direkt durch Quelle [1] gedeckt.",
+  "sources": [
+   "garagenmietvertrag.md",
+   "garagenmietvertrag.md",
+   "garagenmietvertrag.md",
+   "garagenmietvertrag.md",
+   "kfz_versicherung.md",
+   "hausratversicherung.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Wie viel erstattet die Krankenkasse für die Zahnreinigung?",
+  "qtype": "fact",
+  "answer": "Die Krankenkasse erstattet laut Bonusprogramm 40,00 EUR [1].",
+  "seconds": 2.8036509999947157,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (40 EUR) und ist vollständig durch Quelle [1] belegt. Das Weglassen der Rechnungshöhe ist gemäß den Regeln zulässig.",
+  "sources": [
+   "zahnarzt_rechnung.md",
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "nebenkostenabrechnung_2023.md",
+   "hausratversicherung.md",
+   "hausratversicherung.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Wie hoch war die Nachzahlung bei den Nebenkosten 2023?",
+  "qtype": "fact",
+  "answer": "Die Nachzahlung bei den Nebenkosten 2023 betrug 146 EUR [1].",
+  "seconds": 2.9073397000029217,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (146 EUR) gemäß Quelle [1]. Das Fehlen des optionalen Details (Fälligkeit) ist laut Anweisung zulässig.",
+  "sources": [
+   "nebenkostenabrechnung_2023.md",
+   "stromrechnung_2023.md",
+   "mietvertrag.md",
+   "stromrechnung_2024.md",
+   "fahrrad_kaufbeleg.md",
+   "garagenmietvertrag.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Wie setze ich den Router zurück?",
+  "qtype": "fact",
+  "answer": "Um den Router zurückzusetzen, drückst du und hältst den Reset-Knopf auf der Rückseite 10 Sekunden lang gedrückt, bis die Netzwerkleuchte blinkt [1].",
+  "seconds": 3.2040612999990117,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Kernaussage wurde korrekt wiedergegeben. Die Abweichung bei der Bezeichnung der LED ('Netzwerkleuchte' statt 'Power-LED') ist im Kontext als synonym zu werten und widerspricht der Quelle nicht.",
+  "sources": [
+   "router_manual.md",
+   "router_manual.md",
+   "router_manual.md",
+   "handyvertrag.md",
+   "garagenmietvertrag.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "In welchem Hotel übernachten wir in Florenz?",
+  "qtype": "fact",
+  "answer": "Ihr übernachtet im Hotel Bellavista in Florenz [1].",
+  "seconds": 2.7131771000131266,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Kernaussage 'Hotel Bellavista' wurde korrekt wiedergegeben und die Antwort widerspricht keinen Informationen der Quellen.",
+  "sources": [
+   "italien_reise.md",
+   "italien_reise.md",
+   "kfz_versicherung.md",
+   "lasagne_rezept.md",
+   "kfz_versicherung.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Wie viel Datenvolumen hat mein Handyvertrag?",
+  "qtype": "fact",
+  "answer": "Dein Handyvertrag bietet 20 GB Datenvolumen pro Monat mit 5G [1].",
+  "seconds": 2.9502132999914465,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die Kernaussage (20 GB pro Monat) sowie das optionale Detail (5G) korrekt und deckt sich vollständig mit Quelle [1].",
+  "sources": [
+   "handyvertrag.md",
+   "kfz_versicherung.md",
+   "stromrechnung_2023.md",
+   "stromrechnung_2024.md",
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Wie lange muss ich die Lasagne backen?",
+  "qtype": "fact",
+  "answer": "Du musst die Lasagne 40 Minuten bei 180 °C backen [1].",
+  "seconds": 2.8220349999901373,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die vollständige Kernaussage und ist durch Quelle [1] korrekt belegt.",
+  "sources": [
+   "lasagne_rezept.md",
+   "lasagne_rezept.md",
+   "router_manual.md",
+   "arbeitsvertrag.md",
+   "italien_reise.md",
+   "laptop_kaufbeleg.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Wie hoch ist meine Rentenversicherungsnummer?",
+  "qtype": "unanswerable",
+  "answer": "Dazu habe ich in deinen Dateien nichts gefunden.",
+  "seconds": 2.576730499989935,
+  "abstained": true,
+  "cites_source": null,
+  "correct": null,
+  "grounded": null,
+  "reason": "",
+  "sources": [
+   "hausratversicherung.md",
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "hausratversicherung.md",
+   "kfz_versicherung.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Wann läuft mein Reisepass ab?",
+  "qtype": "unanswerable",
+  "answer": "Dazu habe ich in deinen Dateien nichts gefunden.",
+  "seconds": 2.5876766000001226,
+  "abstained": true,
+  "cites_source": null,
+  "correct": null,
+  "grounded": null,
+  "reason": "",
+  "sources": [
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md",
+   "handyvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Wie hoch ist die Kündigungsfrist meines Fitnessstudios?",
+  "qtype": "unanswerable",
+  "answer": "Dazu habe ich in deinen Dateien nichts gefunden.",
+  "seconds": 2.5930775000015274,
+  "abstained": true,
+  "cites_source": null,
+  "correct": null,
+  "grounded": null,
+  "reason": "",
+  "sources": [
+   "mietvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "garagenmietvertrag.md",
+   "handyvertrag.md",
+   "arbeitsvertrag.md",
+   "alter_arbeitsvertrag_2019.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Welche Farbe hat mein Auto?",
+  "qtype": "unanswerable",
+  "answer": "Dazu habe ich in deinen Dateien nichts gefunden.",
+  "seconds": 2.6579743000038434,
+  "abstained": true,
+  "cites_source": null,
+  "correct": null,
+  "grounded": null,
+  "reason": "",
+  "sources": [
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "garagenmietvertrag.md",
+   "fahrrad_kaufbeleg.md",
+   "laptop_kaufbeleg.md"
+  ]
+ },
+ {
+  "model": "qwen3.5-9b",
+  "question": "Welche Schadenfreiheitsklasse habe ich in der Teilkasko?",
+  "qtype": "unanswerable",
+  "answer": "In deiner Teilkasko hast du die Schadenfreiheitsklasse SF 5 [1].",
+  "seconds": 2.8525523000134854,
+  "abstained": false,
+  "cites_source": null,
+  "correct": null,
+  "grounded": null,
+  "reason": "",
+  "sources": [
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "fahrrad_kaufbeleg.md",
+   "hausratversicherung.md",
+   "laptop_kaufbeleg.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Wie lange ist die Kündigungsfrist für meine Wohnung?",
+  "qtype": "fact",
+  "answer": "Die Kündigungsfrist für dich als Mieterin beträgt drei Monate zum Monatsende [1]. Die Kündigung muss schriftlich erfolgen [1].",
+  "seconds": 11.59328070000629,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die Kernaussage korrekt und gibt das optionale Detail wahrheitsgetreu wieder. Alle Informationen sind durch Quelle [1] belegt.",
+  "sources": [
+   "mietvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "mietvertrag.md",
+   "mietvertrag.md",
+   "nebenkostenabrechnung_2023.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Wie hoch ist die Kaution für die Wohnung?",
+  "qtype": "fact",
+  "answer": "Die Mietsicherheit (Kaution) beträgt 2.100,00 EUR [1].",
+  "seconds": 6.938918100000592,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Kernaussage (2.100 EUR) ist korrekt wiedergegeben und die Antwort ist vollständig durch Quelle [1] belegt. Das Fehlen der optionalen Information zur Ratenzahlung macht die Antwort nicht falsch.",
+  "sources": [
+   "mietvertrag.md",
+   "hausratversicherung.md",
+   "mietvertrag.md",
+   "nebenkostenabrechnung_2023.md",
+   "mietvertrag.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Darf ich eine Katze halten?",
+  "qtype": "condition",
+  "answer": "Die Haltung von Haustieren, ausgenommen Kleintiere in Käfigen, bedarf der vorherigen Zustimmung des Vermieters [2].",
+  "seconds": 9.629371200004243,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die vollständige Kernaussage und ist durch Quelle [2] vollständig belegt.",
+  "sources": [
+   "garagenmietvertrag.md",
+   "mietvertrag.md",
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "garagenmietvertrag.md",
+   "kfz_versicherung.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Wie viel Strom habe ich 2023 verbraucht?",
+  "qtype": "disambiguation",
+  "answer": "Du hast im Jahr 2023 einen Verbrauch von 2.610 kWh [1].",
+  "seconds": 7.111483300002874,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (2.610 kWh) und diese ist durch Quelle [1] eindeutig belegt.",
+  "sources": [
+   "stromrechnung_2023.md",
+   "nebenkostenabrechnung_2023.md",
+   "stromrechnung_2024.md",
+   "fahrrad_kaufbeleg.md",
+   "alter_arbeitsvertrag_2019.md",
+   "handyvertrag.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Wie viel Strom habe ich 2024 verbraucht?",
+  "qtype": "disambiguation",
+  "answer": "Du hast im Jahr 2024 einen Verbrauch von 2.340 kWh [1].",
+  "seconds": 7.16932590000215,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (2.340 kWh) und ist durch die Quelle [1] vollständig belegt.",
+  "sources": [
+   "stromrechnung_2024.md",
+   "stromrechnung_2023.md",
+   "nebenkostenabrechnung_2023.md",
+   "handyvertrag.md",
+   "laptop_kaufbeleg.md",
+   "zahnarzt_rechnung.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Wie hoch ist mein aktueller monatlicher Stromabschlag?",
+  "qtype": "disambiguation",
+  "answer": "Dein neuer monatlicher Abschlag ab März 2024 beträgt 65,00 EUR [2].",
+  "seconds": 8.223546599998372,
+  "abstained": false,
+  "cites_source": false,
+  "correct": false,
+  "grounded": true,
+  "reason": "Die Antwort enthält nicht die geforderte Kernaussage (70 EUR), sondern gibt einen veralteten Wert aus Quelle [2] wieder. Zudem bezieht sie sich auf das falsche Jahr (2024 statt 2025).",
+  "sources": [
+   "handyvertrag.md",
+   "stromrechnung_2023.md",
+   "stromrechnung_2024.md",
+   "arbeitsvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Musste ich für 2023 beim Strom nachzahlen?",
+  "qtype": "disambiguation",
+  "answer": "Nein, du hast für das Jahr 2023 ein Guthaben von 41,52 EUR [2].",
+  "seconds": 8.611796500001219,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage und gibt den Betrag des Guthabens aus Quelle [2] exakt wieder.",
+  "sources": [
+   "nebenkostenabrechnung_2023.md",
+   "stromrechnung_2023.md",
+   "stromrechnung_2024.md",
+   "fahrrad_kaufbeleg.md",
+   "handyvertrag.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Wie hoch ist die Selbstbeteiligung in der Vollkasko?",
+  "qtype": "fact",
+  "answer": "Die Selbstbeteiligung in der Vollkasko beträgt 300 EUR je Schadensfall [1].",
+  "seconds": 6.958424399999785,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort gibt die Kernaussage korrekt wieder und ist vollständig durch Quelle [1] gedeckt.",
+  "sources": [
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "hausratversicherung.md",
+   "hausratversicherung.md",
+   "hausratversicherung.md",
+   "fahrrad_kaufbeleg.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Wie viele Urlaubstage habe ich im aktuellen Job?",
+  "qtype": "disambiguation",
+  "answer": "Du erhältst 30 Urlaubstage pro Kalenderjahr [2].",
+  "seconds": 4.801927299995441,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (30 Tage) und ist durch die Quelle [2] eindeutig belegt. Der alte Vertrag [1] wird ignoriert, da die Frage nach dem 'aktuellen' Job gestellt wurde.",
+  "sources": [
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md",
+   "arbeitsvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md",
+   "arbeitsvertrag.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Wie viele Urlaubstage hatte ich beim alten Arbeitgeber?",
+  "qtype": "disambiguation",
+  "answer": "Du hattest beim alten Arbeitgeber 26 Urlaubstage pro Kalenderjahr [1].",
+  "seconds": 5.9825416000094265,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (26 Urlaubstage) und diese ist durch Quelle [1] eindeutig belegt. Das Fehlen des Arbeitgebernamens ist gemäß den Regeln zulässig.",
+  "sources": [
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "alter_arbeitsvertrag_2019.md",
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Wie viel verdiene ich aktuell brutto?",
+  "qtype": "disambiguation",
+  "answer": "Dein aktuelles Bruttogehalt beträgt 4.200 EUR monatlich [3].",
+  "seconds": 7.335119299998041,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (4.200 EUR brutto im Monat) und ist durch Quelle [3] vollständig belegt.",
+  "sources": [
+   "stromrechnung_2024.md",
+   "stromrechnung_2023.md",
+   "arbeitsvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "zahnarzt_rechnung.md",
+   "hausratversicherung.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Bis wann habe ich Garantie auf meinen Laptop?",
+  "qtype": "reasoning",
+  "answer": "Die Herstellergarantie für deinen Laptop beträgt 24 Monate ab Kaufdatum [1].",
+  "seconds": 5.843755599998985,
+  "abstained": false,
+  "cites_source": true,
+  "correct": false,
+  "grounded": true,
+  "reason": "Die Kernaussage verlangt zwingend die Nennung des Kaufdatums (12.03.2024), um die Information vollständig zu machen. Da das Kaufdatum in der Antwort fehlt, ist die Kernaussage nicht vollständig erfüllt.",
+  "sources": [
+   "laptop_kaufbeleg.md",
+   "fahrrad_kaufbeleg.md",
+   "handyvertrag.md",
+   "router_manual.md",
+   "stromrechnung_2024.md",
+   "stromrechnung_2023.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Ist mein Fahrrad versichert, wenn es gestohlen wird?",
+  "qtype": "condition",
+  "answer": "Fahrraddiebstahl ist bis 1.000 EUR mitversichert, sofern das Fahrrad abgeschlossen war [1].",
+  "seconds": 8.423753900002339,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die vollständige Kernaussage (Versicherungsschutz bis 1.000 EUR bei Abschluss/Abschließen) und ist vollständig durch Quelle [1] gedeckt.",
+  "sources": [
+   "hausratversicherung.md",
+   "fahrrad_kaufbeleg.md",
+   "hausratversicherung.md",
+   "garagenmietvertrag.md",
+   "kfz_versicherung.md",
+   "kfz_versicherung.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Darf ich Benzinkanister in der Garage lagern?",
+  "qtype": "reasoning",
+  "answer": "Nein, die Lagerung von brennbaren Flüssigkeiten ist untersagt [1].",
+  "seconds": 6.055247099997359,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die Kernaussage korrekt und ist durch Quelle [1] vollständig belegt.",
+  "sources": [
+   "garagenmietvertrag.md",
+   "garagenmietvertrag.md",
+   "garagenmietvertrag.md",
+   "garagenmietvertrag.md",
+   "kfz_versicherung.md",
+   "hausratversicherung.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Wie viel erstattet die Krankenkasse für die Zahnreinigung?",
+  "qtype": "fact",
+  "answer": "Die Krankenkasse erstattet laut Bonusprogramm 40,00 EUR [1].",
+  "seconds": 6.05274400000053,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (40 EUR) und ist vollständig durch Quelle [1] belegt. Das Weglassen der Rechnungshöhe ist gemäß den Regeln zulässig.",
+  "sources": [
+   "zahnarzt_rechnung.md",
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "nebenkostenabrechnung_2023.md",
+   "hausratversicherung.md",
+   "hausratversicherung.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Wie hoch war die Nachzahlung bei den Nebenkosten 2023?",
+  "qtype": "fact",
+  "answer": "Die Nachzahlung bei den Nebenkosten 2023 beträgt 146 EUR [1].",
+  "seconds": 7.078514599998016,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (146 EUR) gemäß Quelle [1] und verzichtet korrekt auf das optionale Detail des Fälligkeitsdatums.",
+  "sources": [
+   "nebenkostenabrechnung_2023.md",
+   "stromrechnung_2023.md",
+   "mietvertrag.md",
+   "stromrechnung_2024.md",
+   "fahrrad_kaufbeleg.md",
+   "garagenmietvertrag.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Wie setze ich den Router zurück?",
+  "qtype": "fact",
+  "answer": "Um den Router auf die Werkseinstellungen zurückzusetzen, drücke die Reset-Taste auf der Rückseite für 10 Sekunden, bis die Power-LED blinkt [1].",
+  "seconds": 11.728451400005724,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die vollständige Kernaussage und das optionale Detail korrekt gemäß Quelle [1].",
+  "sources": [
+   "router_manual.md",
+   "router_manual.md",
+   "router_manual.md",
+   "handyvertrag.md",
+   "garagenmietvertrag.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "In welchem Hotel übernachten wir in Florenz?",
+  "qtype": "fact",
+  "answer": "Du übernachtest im Hotel Bellavista in Florenz [1].",
+  "seconds": 4.521268600001349,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die Kernaussage (Hotel Bellavista) korrekt und lässt die optionalen Details (Datum, Zimmerart) zulässigerweise weg. Alle Informationen sind durch Quelle [1] belegt.",
+  "sources": [
+   "italien_reise.md",
+   "italien_reise.md",
+   "kfz_versicherung.md",
+   "lasagne_rezept.md",
+   "kfz_versicherung.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Wie viel Datenvolumen hat mein Handyvertrag?",
+  "qtype": "fact",
+  "answer": "Dein Handyvertrag beinhaltet 20 GB Datenvolumen pro Monat mit 5G [1].",
+  "seconds": 6.750788700010162,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die Kernaussage (20 GB pro Monat) sowie das optionale Detail (5G) korrekt und deckt sich vollständig mit Quelle [1].",
+  "sources": [
+   "handyvertrag.md",
+   "kfz_versicherung.md",
+   "stromrechnung_2023.md",
+   "stromrechnung_2024.md",
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Wie lange muss ich die Lasagne backen?",
+  "qtype": "fact",
+  "answer": "Du musst die Lasagne bei 180 °C 40 Minuten backen [1].",
+  "seconds": 6.622298499991302,
+  "abstained": false,
+  "cites_source": true,
+  "correct": true,
+  "grounded": true,
+  "reason": "Die Antwort enthält die korrekte Kernaussage (40 Minuten bei 180 °C) und diese ist durch Quelle [1] direkt belegt.",
+  "sources": [
+   "lasagne_rezept.md",
+   "lasagne_rezept.md",
+   "router_manual.md",
+   "arbeitsvertrag.md",
+   "italien_reise.md",
+   "laptop_kaufbeleg.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Wie hoch ist meine Rentenversicherungsnummer?",
+  "qtype": "unanswerable",
+  "answer": "Dazu habe ich in deinen Dateien nichts gefunden.",
+  "seconds": 3.3233282000001054,
+  "abstained": true,
+  "cites_source": null,
+  "correct": null,
+  "grounded": null,
+  "reason": "",
+  "sources": [
+   "hausratversicherung.md",
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "hausratversicherung.md",
+   "kfz_versicherung.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Wann läuft mein Reisepass ab?",
+  "qtype": "unanswerable",
+  "answer": "Dazu habe ich in deinen Dateien nichts gefunden.",
+  "seconds": 3.3087514999933774,
+  "abstained": true,
+  "cites_source": null,
+  "correct": null,
+  "grounded": null,
+  "reason": "",
+  "sources": [
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md",
+   "handyvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "arbeitsvertrag.md",
+   "mietvertrag.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Wie hoch ist die Kündigungsfrist meines Fitnessstudios?",
+  "qtype": "unanswerable",
+  "answer": "Dazu habe ich in deinen Dateien nichts gefunden.",
+  "seconds": 3.3660721000051126,
+  "abstained": true,
+  "cites_source": null,
+  "correct": null,
+  "grounded": null,
+  "reason": "",
+  "sources": [
+   "mietvertrag.md",
+   "alter_arbeitsvertrag_2019.md",
+   "garagenmietvertrag.md",
+   "handyvertrag.md",
+   "arbeitsvertrag.md",
+   "alter_arbeitsvertrag_2019.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Welche Farbe hat mein Auto?",
+  "qtype": "unanswerable",
+  "answer": "Dazu habe ich in deinen Dateien nichts gefunden.",
+  "seconds": 3.387513499998022,
+  "abstained": true,
+  "cites_source": null,
+  "correct": null,
+  "grounded": null,
+  "reason": "",
+  "sources": [
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "garagenmietvertrag.md",
+   "fahrrad_kaufbeleg.md",
+   "laptop_kaufbeleg.md"
+  ]
+ },
+ {
+  "model": "run-20261109T095346Z-1b210ccf/candidate-0014",
+  "question": "Welche Schadenfreiheitsklasse habe ich in der Teilkasko?",
+  "qtype": "unanswerable",
+  "answer": "Dazu habe ich in deinen Dateien nichts gefunden.",
+  "seconds": 3.3732366999902297,
+  "abstained": true,
+  "cites_source": null,
+  "correct": null,
+  "grounded": null,
+  "reason": "",
+  "sources": [
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "kfz_versicherung.md",
+   "fahrrad_kaufbeleg.md",
+   "hausratversicherung.md",
+   "laptop_kaufbeleg.md"
+  ]
+ }
+]

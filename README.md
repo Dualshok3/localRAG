@@ -222,7 +222,7 @@ Für Claude Desktop in `claude_desktop_config.json`:
 
 ## Messung: Stichwort vs. Vektor vs. Hybrid
 
-Synthetischer Testkorpus mit 16 Dokumenten und 35 Fragen ([eval/results/latest.md](eval/results/latest.md)).
+Synthetischer Testkorpus mit 16 Dokumenten und 40 Fragen ([eval/results/latest.md](eval/results/latest.md)).
 Er enthält absichtlich ähnliche Dokumente als Fallen: Stromrechnung 2023 und 2024, Wohnungs- und
 Garagenmietvertrag, alter und aktueller Arbeitsvertrag.
 
@@ -231,12 +231,12 @@ Garagenmietvertrag, alter und aktueller Arbeitsvertrag.
 | Stichworte aus dem Dokument | 12 | 1.00 | 1.00 | 1.00 |
 | Umschreibungen („Darf ich eine Katze halten?“ → *Haustiere*) | 13 | 0.23 | **0.92** | 0.69 |
 | Exakte Kennungen (Seriennummer, IP, Betrag) | 5 | **1.00** | 0.40 | **1.00** |
-| Ähnliche Dokumente unterscheiden („Strom **2023**“) | 5 | 0.20 | **1.00** | 0.60 |
-| **Gesamt** | 35 | 0.60 | **0.89** | 0.83 |
+| Ähnliche Dokumente unterscheiden („Strom **2023**“) | 10 | 0.50 | **0.90** | 0.70 |
+| **Gesamt** | 40 | 0.62 | **0.88** | 0.82 |
 
 Angegeben ist Recall@1, also wie oft die richtige Datei auf Platz 1 steht. Bei Recall@3 erreichen
 Vektor und Hybrid jeweils 1.00, die richtige Datei ist also immer unter den ersten drei. Latenz pro Suche
-auf der GPU: rund 22 ms.
+auf der GPU: rund 25 ms.
 
 Was man daraus lernt:
 - **BM25** scheitert an Umschreibungen, **Vektoren** an exakten Kennungen.
@@ -248,8 +248,50 @@ Was man daraus lernt:
   beides, hier im synthetischen Korpus kaum, siehe
   [Härtere Fragen, Gewichtung und Reranker](#härtere-fragen-gewichtung-und-reranker).
 
-Einschränkung: 35 Fragen sind wenig, ein bis zwei Fragen verschieben die Werte um mehrere Prozentpunkte.
+Einschränkung: 40 Fragen sind wenig, ein bis zwei Fragen verschieben die Werte um mehrere Prozentpunkte.
 Selbst messen: `uv run python eval/run_eval.py`
+
+## Antwortqualität
+
+Die Suche liefert die Quellen, ein Sprachmodell formuliert daraus die Antwort. Ob die stimmt, misst
+[eval/run_answer_eval.py](eval/run_answer_eval.py) auf demselben erfundenen Korpus: 20 beantwortbare
+Fragen mit Referenzantwort (Kernaussage plus optionale Details) und 5 Fallen, deren Antwort nicht in den
+Dateien steht, etwa die Schadenfreiheitsklasse der *Teilkasko*, wenn nur Haftpflicht und Vollkasko
+genannt sind. Alle Modelle bekommen dieselben Quellen. Ein Prüfmodell bewertet, ob die Kernaussage
+getroffen und jede Aussage belegt ist (LLM-as-Judge, Temperatur 0). Ob das Modell „weiß ich nicht“ sagt
+und auf die richtige Datei verweist, wird ohne Prüfmodell gezählt.
+
+| Modell | richtig | belegt | Zitat auf richtige Datei | „weiß ich nicht“ korrekt | Antwortzeit p50 |
+|---|---|---|---|---|---|
+| **Gemma 4 26B-A4B** (LM Studio) | **20/20** | **20/20** | **20/20** | **5/5** | 2,8 s |
+| crit-Engine, Gemma-4-Kandidat 0014 | 18/20 | **20/20** | 19/20 | **5/5** | 6,8 s |
+| Qwen3.5-9B (LM Studio) | 17/20 | 19/20 | **20/20** | 4/5 | 2,9 s |
+
+Prüfmodell: crit-Engine. Vollständige Liste der Fehler: [eval/results/answers.md](eval/results/answers.md).
+
+- **Qwen** schlussfolgert falsch: Eine Katze sei ein „Kleintier in Käfigen“ und brauche keine Zustimmung,
+  24 Monate Garantie ab März 2024 enden angeblich im September 2025, und auf die Frage nach einer
+  Nachzahlung antwortet es „Ja“, obwohl es im selben Satz das Guthaben nennt. Bei der Teilkasko erfindet
+  es eine Schadenfreiheitsklasse.
+- **Die crit-Engine** nennt einmal den Abschlag aus der *älteren* Rechnung (65 statt 70 EUR) und lässt
+  einmal das Kaufdatum weg. Erfunden hat sie nichts, und bei allen Fallen sagt sie „weiß ich nicht“.
+- **Gemma** macht keinen Fehler.
+
+Einschränkungen: 25 Fragen sind wenig. Das Prüfmodell ist zugleich eines der geprüften Modelle und
+könnte eigene Antworten milder bewerten. Mit Gemma als Prüfmodell und strengeren Referenzen lag die
+Rangfolge gleich (Gemma vor Qwen). Die Antwortzeit der crit-Engine wurde gemessen, während auf ihr parallel
+ein anderes Projekt lief.
+
+```bash
+uv run python eval/run_answer_eval.py --models gemma-4-26b-a4b-it,qwen3.5-9b --judge gemma-4-26b-a4b-it --write-report
+```
+
+`localrag ask` nutzt jeden OpenAI-kompatiblen Server. Welcher es ist, steht in der Konfiguration:
+
+```toml
+llm_url = "http://127.0.0.1:8000/v1"
+llm_model = "mein-modell"
+```
 
 ## Test mit echten Dateien
 

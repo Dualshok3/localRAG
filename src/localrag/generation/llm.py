@@ -71,6 +71,16 @@ class ThinkFilter:
         return rest
 
 
+def _configured_llm() -> tuple[str | None, str | None]:
+    from localrag.config import ConfigError, load_config
+
+    try:
+        cfg = load_config()
+    except ConfigError:
+        return None, None
+    return cfg.llm_url, cfg.llm_model
+
+
 class ChatClient:
     def __init__(
         self,
@@ -81,8 +91,10 @@ class ChatClient:
         timeout: float = 300.0,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
-        self.base_url = (base_url or os.environ.get(ENV_LLM_URL) or DEFAULT_LLM_URL).rstrip("/")
-        self._model = model or os.environ.get(ENV_LLM_MODEL)
+        cfg_url, cfg_model = _configured_llm()
+        # Reihenfolge: Argument > Umgebungsvariable > Konfigurationsdatei > LM Studio
+        self.base_url = (base_url or os.environ.get(ENV_LLM_URL) or cfg_url or DEFAULT_LLM_URL).rstrip("/")
+        self._model = model or os.environ.get(ENV_LLM_MODEL) or (cfg_model if not base_url else None)
         key = api_key or os.environ.get(ENV_LLM_API_KEY) or "not-needed"
         self._http = httpx.Client(
             timeout=httpx.Timeout(timeout, connect=5.0),

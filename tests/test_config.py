@@ -68,7 +68,7 @@ def test_index_without_paths_uses_configured_folders_and_drops_newly_excluded(tm
     write(cfg, f"folders = ['{docs.as_posix()}']\ndb = '{db.as_posix()}'\nexclude = ['backup']\n")
     result = runner.invoke(app, ["index", "--no-embed"])
     assert result.exit_code == 0, result.output
-    assert "1 entfernt" in result.output
+    assert "1 entfernt" in " ".join(result.output.split())  # Rich bricht je nach Terminalbreite um
     with Database(db) as d:
         assert [Path(p).name for p in d.iter_document_paths()] == ["brief.md"]
 
@@ -76,7 +76,7 @@ def test_index_without_paths_uses_configured_folders_and_drops_newly_excluded(tm
 def test_index_without_paths_or_config_explains_what_to_do(tmp_path: Path):
     result = CliRunner().invoke(app, ["index", "--db", str(tmp_path / "i.db")])
     assert result.exit_code == 2
-    assert "config --init" in result.output
+    assert "config --init" in " ".join(result.output.split())
 
 
 def test_config_init_writes_template_that_loads(tmp_path: Path, monkeypatch):

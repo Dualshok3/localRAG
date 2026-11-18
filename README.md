@@ -1,9 +1,9 @@
 # LocalRAG – Semantische Suche über die eigenen Dateien
 
-[![CI](https://github.com/Dualshok3/RAG/actions/workflows/ci.yml/badge.svg)](https://github.com/Dualshok3/RAG/actions/workflows/ci.yml)
+[![CI](https://github.com/Dualshok3/localRAG/actions/workflows/ci.yml/badge.svg)](https://github.com/Dualshok3/localRAG/actions/workflows/ci.yml)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
 [![Lizenz: MIT](https://img.shields.io/badge/lizenz-MIT-green)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/Dualshok3/RAG)](https://github.com/Dualshok3/RAG/releases)
+[![Release](https://img.shields.io/github/v/release/Dualshok3/localRAG)](https://github.com/Dualshok3/localRAG/releases)
 ![100 % lokal](https://img.shields.io/badge/daten-100%25%20lokal-success)
 
 > Frag deinen Computer in natürlicher Sprache – komplett lokal, mit Quellenangabe.
@@ -63,7 +63,7 @@ zufällig auf `.msg` enden.
 Voraussetzung: [uv](https://docs.astral.sh/uv/).
 
 ```bash
-git clone https://github.com/Dualshok3/RAG.git && cd RAG
+git clone https://github.com/Dualshok3/localRAG.git && cd localRAG
 uv sync --extra semantic --extra ocr          # PyTorch/CUDA + Windows-OCR; ohne Extras: nur Stichwortsuche
 uv run localrag index "D:\Dokumente"          # inkrementell, beim zweiten Lauf nur Änderungen
 uv run localrag search "Darf ich eine Katze halten?"
@@ -213,7 +213,7 @@ Der Assistent kann damit mehrfach suchen und gezielt nachlesen.
 
 ```bash
 uv sync --extra semantic --extra mcp
-claude mcp add localrag -- uv --directory C:\pfad\zu\RAG run localrag mcp --allow "D:\Dokumente"
+claude mcp add localrag -- uv --directory C:\pfad\zu\localRAG run localrag mcp --allow "D:\Dokumente"
 ```
 
 Für Claude Desktop in `claude_desktop_config.json`:
@@ -223,7 +223,7 @@ Für Claude Desktop in `claude_desktop_config.json`:
   "mcpServers": {
     "localrag": {
       "command": "uv",
-      "args": ["--directory", "C:\\pfad\\zu\\RAG", "run", "localrag", "mcp", "--allow", "D:\\Dokumente"],
+      "args": ["--directory", "C:\\pfad\\zu\\localRAG", "run", "localrag", "mcp", "--allow", "D:\\Dokumente"],
       "env": { "LOCALRAG_DB": "D:\\localrag\\localrag.db", "LOCALRAG_MODELS": "D:\\localrag\\models" }
     }
   }

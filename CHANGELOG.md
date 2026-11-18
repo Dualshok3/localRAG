@@ -72,5 +72,5 @@ Erste veröffentlichte Version.
   Vektoren im Arbeitsspeicher.
 - Eval-Set mit Messungen: Stichwort, Vektor, Hybrid und Reranker, dazu ein Vergleich mit der Windows-Suche.
 
-[0.2.0]: https://github.com/Dualshok3/RAG/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/Dualshok3/RAG/releases/tag/v0.1.0
+[0.2.0]: https://github.com/Dualshok3/localRAG/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/Dualshok3/localRAG/releases/tag/v0.1.0

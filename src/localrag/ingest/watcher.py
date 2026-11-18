@@ -53,6 +53,7 @@ class FolderWatcher:
         debounce: float = DEFAULT_DEBOUNCE_S,
         lock: threading.Lock | None = None,
         on_batch: Callable[[WatchBatch], None] | None = None,
+        extensions: Iterable[str] = SUPPORTED_EXTENSIONS,
     ) -> None:
         self.db_path = Path(db_path).resolve()
         self.roots = [Path(r).resolve() for r in roots]
@@ -63,6 +64,7 @@ class FolderWatcher:
         self.debounce = debounce
         self.lock = lock  # z. B. die Modell-Sperre des Dienstes: Einbetten und Suchen nicht gleichzeitig
         self.on_batch = on_batch
+        self.extensions = frozenset(e.lower() for e in extensions)
         self._pending: set[Path] = set()
         self._last_event = 0.0
         self._cond = threading.Condition()
@@ -79,7 +81,7 @@ class FolderWatcher:
             return False
         if os.path.normcase(os.path.abspath(path)).startswith(os.path.normcase(str(self.db_path))):
             return False  # eigene Datenbank inkl. -wal/-shm
-        if not is_directory and os.path.splitext(path)[1].lower() not in SUPPORTED_EXTENSIONS:
+        if not is_directory and os.path.splitext(path)[1].lower() not in self.extensions:
             return False
         return not self.rules.path_excluded(path, root)
 
@@ -108,6 +110,7 @@ class FolderWatcher:
                     max_file_mb=self.max_file_mb,
                     embedder=self.embedder,
                     ocr=self.ocr,
+                    extensions=self.extensions,
                 )
         except Exception as exc:  # ein kaputter Durchlauf darf den Watcher nicht beenden
             error = f"{type(exc).__name__}: {exc}"

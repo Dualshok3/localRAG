@@ -25,6 +25,11 @@ class SearchHit:
     duplicates: tuple[str, ...] = ()
 
 
+def page_label(filetype: str, page: int) -> str:
+    """„Seite 3“, bei Präsentationen „Folie 3“."""
+    return f"{'Folie' if filetype == 'pptx' else 'Seite'} {page}"
+
+
 def build_match_query(terms: list[str]) -> str:
     # Jeder Term in Anführungszeichen → FTS5-Sonderzeichen/Operatoren in der Eingabe sind harmlos.
     return " OR ".join(f'"{t}"' for t in terms)

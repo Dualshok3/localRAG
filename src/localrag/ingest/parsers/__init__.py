@@ -12,7 +12,7 @@ from .office import parse_docx
 from .pdf import parse_pdf
 from .slides import parse_pptx
 from .tables import parse_csv, parse_xlsx
-from .text import parse_markdown, parse_txt
+from .text import parse_code, parse_markdown, parse_txt
 from .web import parse_html
 
 if TYPE_CHECKING:
@@ -38,15 +38,34 @@ PARSERS: dict[str, Parser] = {
 
 SUPPORTED_EXTENSIONS: frozenset[str] = frozenset(PARSERS)
 
+# Quellcode nur auf Wunsch (`code = true` in der Konfiguration): Wer ganze Laufwerke indexiert, hätte
+# sonst Bibliotheken und Abhängigkeiten im Index, die eigene Dokumente verdrängen.
+CODE_EXTENSIONS: frozenset[str] = frozenset(
+    {
+        ".py", ".js", ".mjs", ".ts", ".tsx", ".jsx", ".java", ".kt", ".cs", ".c", ".h", ".cpp", ".hpp",
+        ".go", ".rs", ".rb", ".php", ".swift", ".ps1", ".sh", ".bat", ".sql", ".r", ".lua", ".vue",
+    }
+)  # fmt: skip
+
 
 def parse(path: Path, ocr: OcrEngine | None = None) -> list[Section]:
     suffix = path.suffix.lower()
     if suffix == ".pdf":
         return parse_pdf(path, ocr=ocr)  # nur PDFs können Scans ohne Textebene sein
     parser = PARSERS.get(suffix)
+    if parser is None and suffix in CODE_EXTENSIONS:
+        parser = parse_code
     if parser is None:
         raise ParseError(f"Dateityp {path.suffix} wird nicht unterstützt")
     return parser(path)
 
 
-__all__ = ["PARSERS", "SUPPORTED_EXTENSIONS", "ParseError", "Section", "SkippedFile", "parse"]
+__all__ = [
+    "CODE_EXTENSIONS",
+    "PARSERS",
+    "SUPPORTED_EXTENSIONS",
+    "ParseError",
+    "Section",
+    "SkippedFile",
+    "parse",
+]

@@ -39,6 +39,7 @@ from localrag.ingest.ocr import OcrUnavailableError, load_ocr
 from localrag.ingest.scanner import FileInfo
 from localrag.retrieval.filters import parse_query
 from localrag.retrieval.hybrid import search as run_search
+from localrag.retrieval.keyword import page_label
 from localrag.retrieval.reranker import CrossEncoderReranker, Reranker
 
 # Windows-Konsolen nutzen teils noch cp1252 → Umlaute/Sonderzeichen nie mit Absturz quittieren.
@@ -255,6 +256,7 @@ def index(
                 reembed=reembed,
                 embed_progress=on_embed,
                 ocr=ocr_engine,
+                extensions=cfg.extensions(),
             )
         except EmbeddingModelMismatchError as exc:
             console.print(f"[red]{exc}[/red]")
@@ -315,6 +317,7 @@ def _make_watcher(db: Path, roots: list[Path], cfg: Config, exclude, embedder, l
         max_file_mb=cfg.max_file_mb,
         lock=lock,
         on_batch=report,
+        extensions=cfg.extensions(),
     )
 
 
@@ -477,7 +480,7 @@ def search(
         return
 
     for i, h in enumerate(hits, start=1):
-        location = f"Seite {h.page}" if h.page else (h.heading_path or "")
+        location = page_label(h.filetype, h.page) if h.page else (h.heading_path or "")
         header = Text.assemble((f"{i:>2}. ", "bold"), (h.path, "cyan"))
         if location:
             header.append(f"  · {location}", style="dim")
@@ -635,7 +638,7 @@ def _print_answer_footer(
     if result.cited_sources:
         console.print("\n[bold]Quellen[/bold]")
         for n, h in result.cited_sources:
-            location = f"  · Seite {h.page}" if h.page else ""
+            location = f"  · {page_label(h.filetype, h.page)}" if h.page else ""
             if not location and h.heading_path:
                 location = f"  · {h.heading_path}"
             console.print(Text.assemble((f"[{n}] ", "bold"), (h.path, "cyan"), (location, "dim")))
@@ -715,6 +718,68 @@ def _config_or_exit() -> Config:
     except ConfigError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(2) from exc
+
+
+AUTOSTART_NAME = "LocalRAG.vbs"
+
+
+def autostart_script(python: str, log: Path, env: dict[str, str]) -> str:
+    """VBScript für den Autostart-Ordner: startet `serve --watch` unsichtbar und schreibt ein Log."""
+
+    def q(text: str) -> str:
+        return text.replace('"', '""')
+
+    lines = ['Set sh = CreateObject("WScript.Shell")']
+    lines += [f'sh.Environment("Process")("{q(k)}") = "{q(v)}"' for k, v in sorted(env.items())]
+    command = f'cmd /c ""{python}" -m localrag.cli serve --watch > "{log}" 2>&1"'
+    lines.append(f'sh.Run "{q(command)}", 0, False')
+    return "\r\n".join(lines) + "\r\n"
+
+
+def startup_folder() -> Path:
+    import os
+
+    return Path(os.environ["APPDATA"]) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+
+
+@app.command()
+def autostart(
+    enable: Annotated[
+        bool | None, typer.Option("--enable/--disable", help="Beim Anmelden starten bzw. nicht mehr.")
+    ] = None,
+) -> None:
+    """Startet `localrag serve --watch` bei jeder Windows-Anmeldung im Hintergrund (ohne Fenster).
+
+    Ordner und Index kommen aus der Konfiguration. Log: ~/.localrag/serve.log
+    """
+    import os
+
+    if sys.platform != "win32":
+        console.print("[red]Nur unter Windows.[/red] Unter Linux/macOS z. B. systemd bzw. launchd nutzen.")
+        raise typer.Exit(1)
+    target = startup_folder() / AUTOSTART_NAME
+    if enable is None:
+        state = "an" if target.exists() else "aus"
+        console.print(f"Autostart ist [bold]{state}[/bold] ({target})")
+        return
+    if not enable:
+        target.unlink(missing_ok=True)
+        console.print("[green]Autostart entfernt.[/green]")
+        return
+    cfg = _config_or_exit()
+    if not cfg.folders:
+        console.print(
+            f"[red]Erst `folders` in {config_path()} eintragen[/red] – sonst gibt es nichts zu beobachten."
+        )
+        raise typer.Exit(2)
+    env = {k: v for k in ("LOCALRAG_MODELS", "LOCALRAG_CONFIG", "LOCALRAG_DB") if (v := os.environ.get(k))}
+    log = config_path().parent / "serve.log"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(autostart_script(sys.executable, log, env), encoding="utf-16")
+    console.print(f"[green]Autostart eingerichtet:[/green] {target}")
+    console.print(
+        f"[dim]Startet ab der nächsten Anmeldung. Sofort starten: localrag serve --watch · Log: {log}[/dim]"
+    )
 
 
 @app.command("config")

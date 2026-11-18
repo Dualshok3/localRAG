@@ -81,6 +81,41 @@ def parse_txt(path: Path) -> list[Section]:
     return [Section(text=text)] if text.strip() else []
 
 
+_CODE_DEF = re.compile(
+    r"^(?:export\s+)?(?:async\s+)?(?:def|class|function|func|fn|interface|struct|impl|module)\s+(\w+)"
+)
+
+
+def parse_code(path: Path) -> list[Section]:
+    """Quellcode: an Funktionen/Klassen auf oberster Ebene teilen, deren Name wird zur Überschrift.
+
+    Minifizierte Dateien (eine riesige Zeile) fallen wie Daten-Dumps heraus.
+    """
+    text = read_text(path)
+    if any(len(line) >= DUMP_MIN_LINE_CHARS for line in text.splitlines()):
+        raise SkippedFile("minifizierter Code oder Daten")
+    sections: list[Section] = []
+    buffer: list[str] = []
+    name: str | None = None
+
+    def flush() -> None:
+        body = "\n".join(buffer).strip()
+        if body:
+            sections.append(Section(text=body, heading_path=name))
+        buffer.clear()
+
+    for line in text.splitlines():
+        m = _CODE_DEF.match(line)  # nur oberste Ebene: keine Einrückung
+        if m and len(buffer) > 3:
+            flush()
+            name = m.group(1)
+        elif m:
+            name = m.group(1)
+        buffer.append(line)
+    flush()
+    return sections
+
+
 def parse_markdown(path: Path) -> list[Section]:
     sections: list[Section] = []
     headings = HeadingStack()

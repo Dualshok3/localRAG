@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import PureWindowsPath
 
 from localrag.generation.llm import Message
-from localrag.retrieval.keyword import SearchHit
+from localrag.retrieval.keyword import SearchHit, page_label
 
 NO_ANSWER = "Dazu habe ich in deinen Dateien nichts gefunden."
 
@@ -27,7 +27,7 @@ statt eines pauschalen Ja oder Nein.
 def source_label(hit: SearchHit) -> str:
     parts = [PureWindowsPath(hit.path).name]
     if hit.page:
-        parts.append(f"Seite {hit.page}")
+        parts.append(page_label(hit.filetype, hit.page))
     if hit.heading_path:
         parts.append(hit.heading_path)
     return " · ".join(parts)

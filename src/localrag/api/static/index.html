@@ -166,7 +166,8 @@ async function openFile(documentId, reveal) {
 }
 
 function card(hit, n) {
-  const where = hit.page ? `Seite ${hit.page}` : (hit.heading_path || "");
+  const unit = hit.filetype === "pptx" ? "Folie" : "Seite";
+  const where = hit.page ? `${unit} ${hit.page}` : (hit.heading_path || "");
   const actions = el("div", { class: "actions" },
     el("button", { type: "button", onclick: () => openFile(hit.document_id, false) }, "Öffnen"),
     el("button", { type: "button", onclick: () => openFile(hit.document_id, true) }, "Im Ordner zeigen"),

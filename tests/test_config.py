@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 import pytest
@@ -93,3 +94,41 @@ def test_excluded_files_are_removed_only_below_the_indexed_root(db: Database, tm
     write(root / "a.md", "Text")
     index_paths(db, [root], excluded_dirs=["backup"])
     assert len(list(db.iter_document_paths())) == 1  # Wurzel selbst ausdrücklich gewollt
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Autostart-Ordner gibt es nur unter Windows")
+def test_autostart_enable_and_disable(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+    cfg = tmp_path / "config.toml"
+    monkeypatch.setenv("LOCALRAG_CONFIG", str(cfg))
+    monkeypatch.setenv("LOCALRAG_MODELS", "D:/modelle")
+    runner = CliRunner()
+    assert runner.invoke(app, ["autostart", "--enable"]).exit_code == 2  # ohne folders sinnlos
+
+    write(cfg, f"folders = ['{tmp_path.as_posix()}']\n")
+    assert runner.invoke(app, ["autostart", "--enable"]).exit_code == 0
+    vbs = (
+        tmp_path
+        / "appdata"
+        / "Microsoft"
+        / "Windows"
+        / "Start Menu"
+        / "Programs"
+        / "Startup"
+        / "LocalRAG.vbs"
+    )
+    script = vbs.read_text(encoding="utf-16")
+    assert "-m localrag.cli serve --watch" in script
+    assert '("LOCALRAG_MODELS") = "D:/modelle"' in script
+    assert ", 0, False" in script  # unsichtbares Fenster
+    assert "an" in runner.invoke(app, ["autostart"]).output
+    assert runner.invoke(app, ["autostart", "--disable"]).exit_code == 0
+    assert not vbs.exists()
+
+
+def test_autostart_script_escapes_quotes():
+    from localrag.cli import autostart_script
+
+    script = autostart_script(r"C:\Program Files\py\python.exe", Path(r"C:\x\serve.log"), {"A": 'x"y'})
+    assert '("A") = "x""y"' in script
+    assert r'""C:\Program Files\py\python.exe""' in script

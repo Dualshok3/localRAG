@@ -45,6 +45,7 @@ DEFAULT_EXCLUDED_DIRS: frozenset[str] = frozenset(
         "program files",
         "program files (x86)",
         "programdata",
+        "steamapps",
     }
 )
 
@@ -68,6 +69,9 @@ exclude = [
     # "D:/Dokumente/Alt",
 ]
 
+# Quellcode (.py, .js, .cs …) mitindexieren
+code = false
+
 # Größere Dateien überspringen (MB)
 max_file_mb = 50
 
@@ -87,7 +91,13 @@ class Config:
     default_excludes: bool = True
     max_file_mb: float = DEFAULT_MAX_FILE_MB
     db: Path | None = None
+    code: bool = False  # Quellcode (.py, .js, …) mitindexieren
     source: Path | None = field(default=None, compare=False)
+
+    def extensions(self) -> frozenset[str]:
+        from localrag.ingest.parsers import CODE_EXTENSIONS, SUPPORTED_EXTENSIONS
+
+        return SUPPORTED_EXTENSIONS | CODE_EXTENSIONS if self.code else SUPPORTED_EXTENSIONS
 
     def exclusions(self, extra: list[str] | None = None) -> list[str]:
         base = list(DEFAULT_EXCLUDED_DIRS) if self.default_excludes else []
@@ -111,7 +121,7 @@ def load_config(path: Path | None = None) -> Config:
     except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError) as exc:
         raise ConfigError(f"Konfiguration {path} nicht lesbar: {exc}") from exc
 
-    known = {"folders", "exclude", "default_excludes", "max_file_mb", "db"}
+    known = {"folders", "exclude", "default_excludes", "max_file_mb", "db", "code"}
     unknown = set(data) - known
     if unknown:
         raise ConfigError(f"Unbekannte Einträge in {path}: {', '.join(sorted(unknown))}")
@@ -134,6 +144,7 @@ def load_config(path: Path | None = None) -> Config:
         default_excludes=bool(data.get("default_excludes", True)),
         max_file_mb=float(max_mb),
         db=Path(db).expanduser() if db else None,
+        code=bool(data.get("code", False)),
         source=path,
     )
 

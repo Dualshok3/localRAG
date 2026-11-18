@@ -53,7 +53,10 @@ Quellen
   Ergebnisse stehen [weiter unten](#messung-stichwort-vs-vektor-vs-hybrid).
 
 Formate: PDF (gescannte PDFs per OCR, unter Windows ohne Zusatzsoftware), DOCX, XLSX, PPTX, HTML,
-E-Mails (EML, MSG), Markdown, TXT, CSV.
+E-Mails (EML, MSG), Markdown, TXT, CSV. Quellcode auf Wunsch (`code = true` in der Konfiguration).
+Übersprungen statt indexiert werden Wörterbücher und Datenlisten, CSV-Exporte mit über 5.000 Zeilen,
+von Werkzeugen erzeugte HTML-Dokumentation (Sphinx, Doxygen, Javadoc …) und Programmdateien, die
+zufällig auf `.msg` enden.
 
 ## Quickstart
 
@@ -87,6 +90,7 @@ folders = ["D:/Dokumente", "C:/Users/ich/Desktop"]
 exclude = ["python_projects", "*backup*", "D:/Dokumente/Alt"]
 max_file_mb = 50
 db = "D:/localrag/index.db"
+code = false        # Quellcode (.py, .js, .cs …) mitindexieren
 ```
 
 `exclude`: Ein Name oder Muster gilt für Ordner und Dateien an beliebiger Stelle, ein Pfad nur für genau
@@ -128,10 +132,12 @@ uv run localrag serve --watch        # oder im Dienst: ein Prozess, ein geladene
 Beim Start wird einmal abgeglichen, was sich in der Zwischenzeit geändert hat. Danach sammelt der Watcher
 Dateiereignisse und verarbeitet sie nach 2 s Ruhe gemeinsam. Ein Programm, das beim Speichern mehrmals
 schreibt, löst so nur eine Neuindexierung aus. Gelöschte und umbenannte Dateien und Ordner verschwinden
-aus dem Index. Für den Autostart unter Windows genügt eine geplante Aufgabe:
+aus dem Index. Damit das ohne Zutun läuft, startet `localrag autostart --enable` den Dienst samt Watcher bei
+jeder Windows-Anmeldung unsichtbar im Hintergrund (Skript im Autostart-Ordner, keine Admin-Rechte nötig,
+Log unter `~/.localrag/serve.log`). `--disable` nimmt das zurück.
 
 ```bash
-schtasks /Create /SC ONLOGON /TN LocalRAG /TR "uv --directory C:\pfad\zu\RAG run localrag serve --watch"
+uv run localrag autostart --enable
 ```
 
 ### Web-Oberfläche
@@ -339,18 +345,22 @@ Zum Schluss alles, was es gibt: C: und D: komplett, ohne System- und Programmord
 Code-Projekte, Spiele, Modell-Downloads und Werkzeug-Ordner, also viel Inhalt, der mit den gesuchten
 Dokumenten konkurriert.
 
-| | Benutzerordner | ganze Laufwerke |
-|---|---|---|
-| Dateien gescannt | 334 | 8.771 |
-| davon indexiert / Wortlisten übersprungen / Fehler | 313 / – / 21¹ | 8.372 / 375 / 13 |
-| Abschnitte | 6.808 | 57.498 |
-| Erster Lauf inkl. Vektoren | 2,3 min | 30 min |
-| Zweiter Lauf, nichts geändert | 0,2 s | 1:49 min (Scan von 2 Laufwerken) |
-| Hybrid-Suche über den Dienst, p50 | 56 ms | 53 ms |
-| Hybrid Recall@1 / @5 (78 Fragen) | 0.71 / 0.92 | 0.67 / 0.83 |
-| mit Reranker | 0.76 / 0.92 | 0.73 / 0.86 |
+| | Benutzerordner | ganze Laufwerke | mit Konfiguration² |
+|---|---|---|---|
+| Dateien gescannt | 334 | 8.771 | 381 |
+| davon indexiert / übersprungen / Fehler | 313 / – / 21¹ | 8.372 / 375 / 13 | 369 / 7 / 5 |
+| Abschnitte | 6.808 | 57.498 | 7.193 |
+| Erster Lauf inkl. Vektoren | 2,3 min | 30 min | 2,7 min |
+| Zweiter Lauf, nichts geändert | 0,2 s | 1:49 min (Scan von 2 Laufwerken) | 4,4 s |
+| Hybrid-Suche über den Dienst, p50 | 56 ms | 53 ms | – |
+| Hybrid Recall@1 / @5 (78 Fragen) | 0.71 / 0.92 | 0.67 / 0.83 | 0.68 / 0.90 |
+| mit Reranker | 0.76 / 0.92 | 0.73 / 0.86 | **0.74 / 0.94** |
 
 ¹ Vor den Verbesserungen unten gemessen. Die meisten dieser Fehler waren UTF-16-Dateien.
+² Benutzerordner plus ganz D:, mit [Konfiguration](#konfiguration-welche-ordner-was-nicht): Code-Projekte,
+Spiele und Werkzeug-Ordner per `exclude` ausgeschlossen, dazu die neuen Formate (Excel, PowerPoint, HTML,
+E-Mails). Mehr Ordner als „Benutzerordner“, aber kaum mehr Rauschen: Mit Reranker ist das der beste Wert
+aller drei Indizes.
 
 Was der große Lauf aufgedeckt hat, und was daraus wurde:
 
@@ -367,7 +377,15 @@ Der verbleibende Abstand bei der Trefferquote kommt vor allem von echten Kopien.
 Werdegang stehen auch in Dutzenden Textentwürfen in den Code-Projekten. Bei einer Frage nach einem Datum
 landen diese verwandten Texte vor dem Originaldokument, das als einziges das Datum enthält. Das ist kein Fehler des Index,
 zeigt aber, dass die Frage, welche Ordner man indexiert, die Qualität mehr beeinflusst als jede
-Feinabstimmung.
+Feinabstimmung. Daraus entstanden die [Konfigurationsdatei](#konfiguration-welche-ordner-was-nicht) mit
+Ausschlüssen und die Erkennung erzeugter HTML-Dokumentation: Von 1.848 HTML-Dateien auf C: und D: lagen nur
+7 im Benutzerordner. Der Rest stammte aus Code-Projekten, der Python-Doku (Sphinx) und Spielen.
+
+**Getestet und verworfen: Jahreszahl-Bonus.** Idee: Bei „Stromrechnung 2023“ Abschnitte bevorzugen, die
+2023 im Pfad oder Text tragen. Ergebnis auf 40 synthetischen Fragen (9 davon mit Jahreszahl) und den 78
+echten: keine einzige Änderung. bge-m3 trifft Jahreszahlen schon selbst, auch weil der Dateiname mit
+eingebettet wird. Der einzige Fehlgriff („Abschlag ab März 2024“ steht in der Abrechnung *2023*) lässt sich
+so nicht lösen. Der Code flog wieder raus.
 
 ## Architektur
 

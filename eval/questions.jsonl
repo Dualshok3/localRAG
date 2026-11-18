@@ -33,3 +33,8 @@
 {"question": "WTEST-998877", "expected": "fahrrad_kaufbeleg.md", "type": "exact-id"}
 {"question": "Darf ich Benzinkanister in der Garage lagern?", "expected": "garagenmietvertrag.md", "type": "paraphrase"}
 {"question": "Gab es 2023 eine Rückzahlung vom Stromanbieter?", "expected": "stromrechnung_2023.md", "type": "disambiguation"}
+{"question": "Wie hoch war der Grundpreis beim Strom 2023?", "expected": "stromrechnung_2023.md", "type": "disambiguation"}
+{"question": "Arbeitspreis Strom 2024", "expected": "stromrechnung_2024.md", "type": "disambiguation"}
+{"question": "Welcher Abschlag galt ab März 2024?", "expected": "stromrechnung_2023.md", "type": "disambiguation"}
+{"question": "Was stand im Arbeitsvertrag von 2019 zur Arbeitszeit?", "expected": "alter_arbeitsvertrag_2019.md", "type": "disambiguation"}
+{"question": "Wie viel habe ich 2024 für Strom bezahlt?", "expected": "stromrechnung_2024.md", "type": "disambiguation"}

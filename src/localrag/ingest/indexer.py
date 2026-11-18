@@ -14,7 +14,7 @@ from localrag.index.text_norm import normalize
 from localrag.index.vector_store import VectorStore
 from localrag.ingest.chunker import Chunk, chunk_sections
 from localrag.ingest.ocr import OcrEngine
-from localrag.ingest.parsers import ParseError, SkippedFile, parse
+from localrag.ingest.parsers import SUPPORTED_EXTENSIONS, ParseError, SkippedFile, parse
 from localrag.ingest.parsers.text import data_file_reason, read_text
 from localrag.ingest.scanner import Exclusions, FileInfo, is_under, iter_files
 
@@ -114,6 +114,7 @@ def index_paths(
     reembed: bool = False,
     embed_progress: Callable[[int, int], None] | None = None,
     ocr: OcrEngine | None = None,
+    extensions: Iterable[str] | None = None,
 ) -> IndexStats:
     """Text-Index aktualisieren und – falls ein Embedder übergeben wird – fehlende Vektoren erzeugen.
 
@@ -124,7 +125,11 @@ def index_paths(
     stats = IndexStats()
     seen: set[str] = set()
     rules = excluded_dirs if isinstance(excluded_dirs, Exclusions) else Exclusions(excluded_dirs)
-    files = list(iter_files(roots, excluded_dirs=rules, max_file_mb=max_file_mb))
+    files = list(
+        iter_files(
+            roots, excluded_dirs=rules, max_file_mb=max_file_mb, extensions=extensions or SUPPORTED_EXTENSIONS
+        )
+    )
     # Ältere Indizes kennen den Eintrag noch nicht → gelten als Version 1
     has_docs = db.conn.execute("SELECT 1 FROM documents LIMIT 1").fetchone() is not None
     stored_version = db.get_meta("parser_version") or ("1" if has_docs else None)

@@ -1,0 +1,25 @@
+{"question": "Wie lange ist die Kündigungsfrist für meine Wohnung?", "reference": "Drei Monate zum Monatsende.", "details": "Die Kündigung muss schriftlich erfolgen.", "source": "mietvertrag.md", "type": "fact"}
+{"question": "Wie hoch ist die Kaution für die Wohnung?", "reference": "2.100 EUR.", "details": "Zahlbar in drei Raten.", "source": "mietvertrag.md", "type": "fact"}
+{"question": "Darf ich eine Katze halten?", "reference": "Nur mit vorheriger Zustimmung des Vermieters. Ohne Zustimmung erlaubt sind nur Kleintiere in Käfigen, und dazu gehört eine Katze nicht.", "details": "", "source": "mietvertrag.md", "type": "condition"}
+{"question": "Wie viel Strom habe ich 2023 verbraucht?", "reference": "2.610 kWh.", "details": "", "source": "stromrechnung_2023.md", "type": "disambiguation"}
+{"question": "Wie viel Strom habe ich 2024 verbraucht?", "reference": "2.340 kWh.", "details": "", "source": "stromrechnung_2024.md", "type": "disambiguation"}
+{"question": "Wie hoch ist mein aktueller monatlicher Stromabschlag?", "reference": "70 EUR.", "details": "Gilt ab März 2025 laut Abrechnung 2024.", "source": "stromrechnung_2024.md", "type": "disambiguation"}
+{"question": "Musste ich für 2023 beim Strom nachzahlen?", "reference": "Nein, es gab ein Guthaben von 41,52 EUR.", "details": "", "source": "stromrechnung_2023.md", "type": "disambiguation"}
+{"question": "Wie hoch ist die Selbstbeteiligung in der Vollkasko?", "reference": "300 EUR je Schadensfall.", "details": "", "source": "kfz_versicherung.md", "type": "fact"}
+{"question": "Wie viele Urlaubstage habe ich im aktuellen Job?", "reference": "30 Urlaubstage pro Jahr.", "details": "", "source": "arbeitsvertrag.md", "type": "disambiguation"}
+{"question": "Wie viele Urlaubstage hatte ich beim alten Arbeitgeber?", "reference": "26 Urlaubstage pro Jahr.", "details": "Arbeitgeber war die Alt Consulting AG.", "source": "alter_arbeitsvertrag_2019.md", "type": "disambiguation"}
+{"question": "Wie viel verdiene ich aktuell brutto?", "reference": "4.200 EUR brutto im Monat.", "details": "", "source": "arbeitsvertrag.md", "type": "disambiguation"}
+{"question": "Bis wann habe ich Garantie auf meinen Laptop?", "reference": "24 Monate ab dem Kaufdatum 12.03.2024. Wird ein Enddatum genannt, muss es März 2026 sein.", "details": "Also bis 12.03.2026.", "source": "laptop_kaufbeleg.md", "type": "reasoning"}
+{"question": "Ist mein Fahrrad versichert, wenn es gestohlen wird?", "reference": "Ja, über die Hausratversicherung bis 1.000 EUR, sofern es abgeschlossen war.", "details": "", "source": "hausratversicherung.md", "type": "condition"}
+{"question": "Darf ich Benzinkanister in der Garage lagern?", "reference": "Nein, die Lagerung brennbarer Flüssigkeiten ist untersagt.", "details": "", "source": "garagenmietvertrag.md", "type": "reasoning"}
+{"question": "Wie viel erstattet die Krankenkasse für die Zahnreinigung?", "reference": "40 EUR.", "details": "Laut Bonusprogramm, die Rechnung betrug 95 EUR.", "source": "zahnarzt_rechnung.md", "type": "fact"}
+{"question": "Wie hoch war die Nachzahlung bei den Nebenkosten 2023?", "reference": "146 EUR.", "details": "Fällig bis 30.06.2024.", "source": "nebenkostenabrechnung_2023.md", "type": "fact"}
+{"question": "Wie setze ich den Router zurück?", "reference": "Den Reset-Knopf auf der Rückseite 10 Sekunden gedrückt halten.", "details": "Bis die Power-LED blinkt.", "source": "router_manual.md", "type": "fact"}
+{"question": "In welchem Hotel übernachten wir in Florenz?", "reference": "Hotel Bellavista.", "details": "02.08. bis 09.08., Doppelzimmer mit Frühstück.", "source": "italien_reise.md", "type": "fact"}
+{"question": "Wie viel Datenvolumen hat mein Handyvertrag?", "reference": "20 GB pro Monat.", "details": "Mit 5G.", "source": "handyvertrag.md", "type": "fact"}
+{"question": "Wie lange muss ich die Lasagne backen?", "reference": "40 Minuten bei 180 °C.", "details": "", "source": "lasagne_rezept.md", "type": "fact"}
+{"question": "Wie hoch ist meine Rentenversicherungsnummer?", "reference": "", "details": "", "source": "", "type": "unanswerable"}
+{"question": "Wann läuft mein Reisepass ab?", "reference": "", "details": "", "source": "", "type": "unanswerable"}
+{"question": "Wie hoch ist die Kündigungsfrist meines Fitnessstudios?", "reference": "", "details": "", "source": "", "type": "unanswerable"}
+{"question": "Welche Farbe hat mein Auto?", "reference": "", "details": "", "source": "", "type": "unanswerable"}
+{"question": "Welche Schadenfreiheitsklasse habe ich in der Teilkasko?", "reference": "", "details": "", "source": "", "type": "unanswerable"}

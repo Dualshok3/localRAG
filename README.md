@@ -308,6 +308,12 @@ llm_url = "http://127.0.0.1:8000/v1"
 llm_model = "mein-modell"
 ```
 
+Läuft das Sprachmodell auf derselben Grafikkarte und wird der Speicher knapp, kann das Suchmodell auf den
+Prozessor ausweichen. Dafür `device = "cpu"` in die Konfiguration schreiben, oder die Umgebungsvariable
+`LOCALRAG_DEVICE` setzen. Gemessen im Index mit 7.193 Abschnitten: Eine Suche dauert danach 0,3 bis 0,5 s.
+Die erste Suche nach dem Start lädt das Modell und dauert einmalig knapp eine Minute. Ganze Ordner neu zu
+indexieren wird deutlich langsamer.
+
 ## Test mit echten Dateien
 
 Auch an einem echten Rechner getestet: Desktop, Dokumente, Downloads und ein Studienordner mit 334 Dateien.

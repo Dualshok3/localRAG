@@ -44,7 +44,9 @@ class CrossEncoderReranker:
             ) from exc
 
         self.name = model_name or os.environ.get(ENV_RERANKER, DEFAULT_RERANKER)
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        from localrag.config import resolve_device
+
+        self.device = resolve_device(device) or ("cuda" if torch.cuda.is_available() else "cpu")
         self.batch_size = batch_size
         self._model = CrossEncoder(
             self.name,

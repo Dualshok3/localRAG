@@ -74,3 +74,4 @@ def _no_user_config(tmp_path_factory, monkeypatch):
     """Tests nie von einer echten ~/.localrag/config.toml oder LOCALRAG_DB beeinflussen lassen."""
     monkeypatch.setenv("LOCALRAG_CONFIG", str(tmp_path_factory.mktemp("cfg") / "config.toml"))
     monkeypatch.delenv("LOCALRAG_DB", raising=False)
+    monkeypatch.delenv("LOCALRAG_DEVICE", raising=False)

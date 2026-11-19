@@ -59,7 +59,9 @@ class SentenceTransformerEmbedder:
             ) from exc
 
         self.name = model_name or os.environ.get(ENV_MODEL, DEFAULT_MODEL)
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        from localrag.config import resolve_device
+
+        self.device = resolve_device(device) or ("cuda" if torch.cuda.is_available() else "cpu")
         self.batch_size = batch_size
         cache = os.environ.get(ENV_MODELS)
         self._model = SentenceTransformer(

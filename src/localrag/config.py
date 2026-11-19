@@ -22,6 +22,7 @@ from pathlib import Path
 
 ENV_DB = "LOCALRAG_DB"
 ENV_CONFIG = "LOCALRAG_CONFIG"
+ENV_DEVICE = "LOCALRAG_DEVICE"
 
 # Ordnernamen (case-insensitive), die beim Scannen komplett übersprungen werden.
 DEFAULT_EXCLUDED_DIRS: frozenset[str] = frozenset(
@@ -82,6 +83,9 @@ max_file_mb = 50
 # llm_url = "http://127.0.0.1:1234/v1"
 # llm_model = "gemma-4-26b-a4b-it"
 
+# Rechengerät für Such- und Reranker-Modell: "auto" (Grafikkarte, falls vorhanden), "cpu" oder "cuda"
+# device = "auto"
+
 # Index-Datenbank (sonst ~/.localrag/localrag.db oder LOCALRAG_DB)
 # db = "D:/localrag/index.db"
 """
@@ -102,6 +106,7 @@ class Config:
     llm_url: str | None = None  # OpenAI-kompatibler Server für `ask`
     llm_model: str | None = None
     inbox: Path = field(default_factory=lambda: Path.home() / "Documents" / "LocalRAG-Eingang")
+    device: str = "auto"  # "auto", "cpu" oder "cuda" (auch "cuda:1")
     source: Path | None = field(default=None, compare=False)
 
     def extensions(self) -> frozenset[str]:
@@ -141,6 +146,7 @@ def load_config(path: Path | None = None) -> Config:
         "llm_url",
         "llm_model",
         "inbox",
+        "device",
     }
     unknown = set(data) - known
     if unknown:
@@ -161,6 +167,9 @@ def load_config(path: Path | None = None) -> Config:
     for key in ("llm_url", "llm_model", "inbox"):
         if data.get(key) is not None and not isinstance(data[key], str):
             raise ConfigError(f"{key} in {path} muss ein Text sein")
+    device = data.get("device", "auto")
+    if not isinstance(device, str) or not _valid_device(device):
+        raise ConfigError(f'device in {path} muss "auto", "cpu" oder "cuda" sein')
     return Config(
         folders=tuple(Path(f).expanduser() for f in str_list("folders")),
         exclude=tuple(str_list("exclude")),
@@ -171,8 +180,29 @@ def load_config(path: Path | None = None) -> Config:
         llm_url=data.get("llm_url"),
         llm_model=data.get("llm_model"),
         **({"inbox": Path(data["inbox"]).expanduser()} if data.get("inbox") else {}),
+        device=device.strip().lower(),
         source=path,
     )
+
+
+def _valid_device(value: str) -> bool:
+    v = value.strip().lower()
+    return v in ("auto", "cpu", "cuda") or (v.startswith("cuda:") and v[5:].isdigit())
+
+
+def resolve_device(device: str | None = None) -> str | None:
+    """Rechengerät: Argument > LOCALRAG_DEVICE > ``device`` aus der Konfiguration; None heißt automatisch."""
+    value = device or os.environ.get(ENV_DEVICE)
+    if not value:
+        try:
+            value = load_config().device
+        except ConfigError:
+            value = None
+    if not value or value.strip().lower() == "auto":
+        return None
+    if not _valid_device(value):
+        raise ConfigError(f'Ungültiges Rechengerät "{value}" (erlaubt: auto, cpu, cuda)')
+    return value.strip().lower()
 
 
 def default_db_path() -> Path:

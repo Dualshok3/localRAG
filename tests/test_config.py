@@ -150,3 +150,27 @@ def test_llm_server_from_config_with_env_taking_precedence(tmp_path: Path, monke
     monkeypatch.setenv("LOCALRAG_LLM_URL", "http://env:9/v1")
     with ChatClient() as c:
         assert c.base_url == "http://env:9/v1"
+
+
+def test_device_option(tmp_path, monkeypatch):
+    from localrag.config import ConfigError, load_config, resolve_device
+
+    cfg_file = tmp_path / "config.toml"
+    monkeypatch.setenv("LOCALRAG_CONFIG", str(cfg_file))
+    assert resolve_device() is None  # keine Datei: automatisch
+
+    cfg_file.write_text('device = "CPU"\n', encoding="utf-8")
+    assert load_config().device == "cpu"
+    assert resolve_device() == "cpu"
+    assert resolve_device("cuda") == "cuda"  # Argument hat Vorrang
+
+    monkeypatch.setenv("LOCALRAG_DEVICE", "cuda:0")
+    assert resolve_device() == "cuda:0"  # Umgebungsvariable vor Konfiguration
+    monkeypatch.delenv("LOCALRAG_DEVICE")
+
+    cfg_file.write_text('device = "auto"\n', encoding="utf-8")
+    assert resolve_device() is None
+
+    cfg_file.write_text('device = "gpu"\n', encoding="utf-8")
+    with pytest.raises(ConfigError):
+        load_config()

@@ -3,7 +3,9 @@
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
-## [Unreleased]
+## [0.3.0] – 2026-11-19
+
+Im Alltag angekommen: Autostart, Dateien sofort aufnehmen, Rechengerät wählbar.
 
 ### Neu
 - `localrag autostart --enable/--disable`: Dienst samt Watcher startet bei der Windows-Anmeldung unsichtbar.
@@ -74,5 +76,6 @@ Erste veröffentlichte Version.
   Vektoren im Arbeitsspeicher.
 - Eval-Set mit Messungen: Stichwort, Vektor, Hybrid und Reranker, dazu ein Vergleich mit der Windows-Suche.
 
+[0.3.0]: https://github.com/Dualshok3/localRAG/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Dualshok3/localRAG/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Dualshok3/localRAG/releases/tag/v0.1.0

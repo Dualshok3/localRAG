@@ -1,6 +1,6 @@
 [project]
 name = "localrag"
-version = "0.2.0"
+version = "0.3.0"
 description = "Lokale semantische Suche und RAG über die eigenen Dateien"
 readme = "README.md"
 license = { file = "LICENSE" }

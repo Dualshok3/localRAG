@@ -31,7 +31,7 @@ Quellen
 
 ## Was es kann
 
-- 🔒 **100 % lokal:** Embeddings auf der eigenen GPU, Antworten über LM Studio oder einen anderen lokalen
+- 🔒 **100 % lokal:** Embeddings auf der eigenen GPU (oder CPU), Antworten über LM Studio oder einen anderen lokalen
   OpenAI-kompatiblen Server. Keine Cloud, kein Konto.
 - 🔎 **Hybrid-Suche:** BM25-Stichwortsuche (SQLite FTS5, deutsches Stemming) plus Vektorsuche
   (bge-m3, sqlite-vec), zusammengeführt per Reciprocal Rank Fusion. Alles in **einer** SQLite-Datei,
@@ -258,9 +258,9 @@ Was man daraus lernt:
 - **Hybrid** ist bei Kennungen perfekt, verliert aber bei Umschreibungen Plätze. Einfaches RRF gewichtet
   beide Listen gleich. Findet BM25 nur zufällige Wortübereinstimmungen in falschen Dateien, schieben
   diese den richtigen Vektor-Treffer auf Platz 2 oder 3.
-- Hybrid bleibt der Standard, weil es nie komplett danebenliegt. Inzwischen wird die BM25-Liste bei
-  ganzen Sätzen schwächer gewichtet, und es gibt einen optionalen Reranker. Auf echten Dateien hilft
-  beides, hier im synthetischen Korpus kaum, siehe
+- Hybrid ist der Standard, weil es nie komplett danebenliegt. Bei ganzen Sätzen wird die BM25-Liste
+  schwächer gewichtet, dazu gibt es einen optionalen Reranker. Auf echten Dateien hilft beides, hier im
+  synthetischen Korpus kaum, siehe
   [Härtere Fragen, Gewichtung und Reranker](#härtere-fragen-gewichtung-und-reranker).
 
 Einschränkung: 40 Fragen sind wenig, ein bis zwei Fragen verschieben die Werte um mehrere Prozentpunkte.
@@ -279,7 +279,7 @@ und auf die richtige Datei verweist, wird ohne Prüfmodell gezählt.
 | Modell | richtig | belegt | Zitat auf richtige Datei | „weiß ich nicht“ korrekt | Antwortzeit p50 |
 |---|---|---|---|---|---|
 | **Gemma 4 26B-A4B** (LM Studio) | **20/20** | **20/20** | **20/20** | **5/5** | 2,8 s |
-| crit-Engine, Gemma-4-Kandidat 0014 | 18/20 | **20/20** | 19/20 | **5/5** | 6,8 s |
+| crit-Engine (Gemma 4) | 18/20 | **20/20** | 19/20 | **5/5** | 6,8 s |
 | Qwen3.5-9B (LM Studio) | 17/20 | 19/20 | **20/20** | 4/5 | 2,9 s |
 
 Prüfmodell: crit-Engine. Vollständige Liste der Fehler: [eval/results/answers.md](eval/results/answers.md).
@@ -294,8 +294,7 @@ Prüfmodell: crit-Engine. Vollständige Liste der Fehler: [eval/results/answers.
 
 Einschränkungen: 25 Fragen sind wenig. Das Prüfmodell ist zugleich eines der geprüften Modelle und
 könnte eigene Antworten milder bewerten. Mit Gemma als Prüfmodell und strengeren Referenzen lag die
-Rangfolge gleich (Gemma vor Qwen). Die Antwortzeit der crit-Engine wurde gemessen, während auf ihr parallel
-ein anderes Projekt lief.
+Rangfolge gleich (Gemma vor Qwen). Die Antwortzeit der crit-Engine ist unter paralleler Last gemessen.
 
 ```bash
 uv run python eval/run_answer_eval.py --models gemma-4-26b-a4b-it,qwen3.5-9b --judge gemma-4-26b-a4b-it --write-report
@@ -349,7 +348,7 @@ Die Windows-Suche indexiert standardmäßig nur die Benutzerordner auf C:, der S
 ihr komplett. Nur auf die Fragen zu Dateien gerechnet, die sie kennt, findet sie 6 von 13. Ganze Sätze
 liefern dort fast immer null Treffer, nur Stichworte und Kennungen funktionieren.
 
-Der erste Durchlauf hat Schwächen aufgedeckt, die inzwischen behoben sind:
+Der Test mit echten Dateien hat typische Stolpersteine gezeigt. So geht LocalRAG damit um:
 
 | Befund | Lösung | Wirkung |
 |---|---|---|
@@ -359,31 +358,31 @@ Der erste Durchlauf hat Schwächen aufgedeckt, die inzwischen behoben sind:
 | Leere Antwort des LLM bei unbeantwortbarer Frage | Fester Satz „Dazu habe ich in deinen Dateien nichts gefunden.“ | |
 | Kein Modell geladen → LM Studio lud ungefragt ein anderes (10 GB) | Klare Fehlermeldung statt stillem Wechsel | |
 
-Recall@5 von Hybrid stieg dadurch von 0.88 auf 0.96, gerechnet über dieselben 24 Fragen. Die
-Gewichtung (nächster Abschnitt) bringt es auf 1.00.
+Ohne diese Maßnahmen läge Recall@5 von Hybrid bei 0.88 statt 0.96, gerechnet über dieselben 24 Fragen.
+Mit der Gewichtung (nächster Abschnitt) sind es 1.00.
 
 ### Härtere Fragen, Gewichtung und Reranker
 
 Die 24 Fragen oben entstanden nach dem Lesen der Dokumente und teilen deshalb oft Wörter mit ihnen, das
-begünstigt BM25. Deshalb gibt es zwei weitere Sets: 12 Fragen, die bewusst andere Wörter benutzen
+begünstigt BM25. Dazu kommen zwei weitere Sets: 12 Fragen, die bewusst andere Wörter benutzen
 (Frage und Dokument haben kein Wort gemeinsam, zwei davon auf Deutsch zu englischen Dokumenten), und 42
 gemischte Fragen zu weiteren Dokumenten (Zeugnisse, Bordkarte, E-Mails, Lernskripte). Zusammen 78.
 
-| Variante | 24 alte | 12 schwere | 42 neue | **alle 78** | p50 |
+| Variante | 24 Basis | 12 schwere | 42 gemischte | **alle 78** | p50 |
 |---|---|---|---|---|---|
 | BM25 | 0.79 / 0.83 | 0.17 / 0.33 | 0.62 / 0.79 | 0.60 / 0.73 | 20 ms |
 | Vektor | 0.75 / 0.92 | 0.42 / 0.67 | 0.74 / 0.93 | 0.69 / 0.88 | 54 ms |
-| Hybrid, beide Listen gleich (vorher) | 0.79 / 0.96 | 0.25 / 0.42 | 0.71 / 0.90 | 0.67 / 0.85 | 54 ms |
+| Hybrid, beide Listen gleich | 0.79 / 0.96 | 0.25 / 0.42 | 0.71 / 0.90 | 0.67 / 0.85 | 54 ms |
 | **Hybrid, gewichtet (Standard)** | 0.79 / **1.00** | 0.33 / **0.67** | 0.76 / 0.95 | **0.71 / 0.92** | 53 ms |
 | Hybrid gewichtet + Reranker (`--rerank`) | **0.88 / 1.00** | 0.25 / 0.58 | **0.83 / 0.98** | **0.76 / 0.92** | 388 ms |
 
-Werte: Recall@1 / Recall@5. MRR über alle 78: Vektor 0.76, Hybrid vorher 0.75, gewichtet 0.79, mit
+Werte: Recall@1 / Recall@5. MRR über alle 78: Vektor 0.76, Hybrid ungewichtet 0.75, gewichtet 0.79, mit
 Reranker 0.83.
 
 **Gewichtung nach Art der Anfrage.** Bei ganzen Sätzen findet BM25 viele Zufallstreffer über
 Allerweltswörter und schiebt den richtigen Vektortreffer nach unten. Deshalb zählt die BM25-Liste bei
-Sätzen nur noch 0.3-fach, erkannt an Füllwörtern wie „ich“, „der“, „wann“ oder einem Fragezeichen. Bei
-Kennungen und Stichworten („WTEST-998877“, „Router Firmware“) zählt sie weiter voll. Das kostet keine
+Sätzen nur 0.3-fach, erkannt an Füllwörtern wie „ich“, „der“, „wann“ oder einem Fragezeichen. Bei
+Kennungen und Stichworten („WTEST-998877“, „Router Firmware“) zählt sie voll. Das kostet keine
 Zeit und schlägt beide Einzelverfahren. Getestet wurden auch feste Gewichte 0.5 und 0.3 für alle
 Anfragen: Sie verlieren Kennungen wie Buchungs- und Auftragsnummern, die nur BM25 findet.
 
@@ -391,8 +390,8 @@ Anfragen: Sie verlieren Kennungen wie Buchungs- und Auftragsnummern, die nur BM2
 Abschnitte zusammen mit der Frage und sortiert sie neu. Er bringt vor allem Platz 1 (0.71 → 0.76), kostet
 aber gut 0,3 s pro Suche und bleibt deshalb optional. Getestet wurde auch, seine Reihenfolge mit der
 der ersten Stufe zu mischen statt sie zu ersetzen. Auf diesen 78 Fragen war das gleichauf (MRR 0.84 statt
-0.83), über ganze Laufwerke aber schlechter (Recall@1 0.69 statt 0.73). Deshalb bleibt Ersetzen der
-Standard.
+0.83), über ganze Laufwerke aber schlechter (Recall@1 0.69 statt 0.73). Deshalb ersetzt der Reranker
+die Reihenfolge.
 
 Was keine Variante findet: zwei kurze E-Mails, deren Text fast nur aus Platzhaltern besteht und deren
 Thema in einer Abkürzung steckt („SF-Klasse“ für Schadenfreiheitsrabatt). Außerdem die
@@ -404,7 +403,7 @@ RRF auch mit Gewicht 0.3 noch für den ersten Platz.
 
 ### Ganze Laufwerke
 
-Zum Schluss alles, was es gibt: C: und D: komplett, ohne System- und Programmordner. Dazu kommen
+Der härteste Test: C: und D: komplett, ohne System- und Programmordner. Dazu kommen
 Code-Projekte, Spiele, Modell-Downloads und Werkzeug-Ordner, also viel Inhalt, der mit den gesuchten
 Dokumenten konkurriert.
 
@@ -419,19 +418,19 @@ Dokumenten konkurriert.
 | Hybrid Recall@1 / @5 (78 Fragen) | 0.71 / 0.92 | 0.67 / 0.83 | 0.68 / 0.90 |
 | mit Reranker | 0.76 / 0.92 | 0.73 / 0.86 | **0.74 / 0.94** |
 
-¹ Vor den Verbesserungen unten gemessen. Die meisten dieser Fehler waren UTF-16-Dateien.
+¹ Ohne die UTF-16-Erkennung aus der Tabelle unten gemessen, die meisten dieser Fehler waren UTF-16-Dateien.
 ² Benutzerordner plus ganz D:, mit [Konfiguration](#konfiguration-welche-ordner-was-nicht): Code-Projekte,
-Spiele und Werkzeug-Ordner per `exclude` ausgeschlossen, dazu die neuen Formate (Excel, PowerPoint, HTML,
+Spiele und Werkzeug-Ordner per `exclude` ausgeschlossen, mit allen Formaten (auch Excel, PowerPoint, HTML,
 E-Mails). Mehr Ordner als „Benutzerordner“, aber kaum mehr Rauschen: Mit Reranker ist das der beste Wert
 aller drei Indizes.
 
-Was der große Lauf aufgedeckt hat, und was daraus wurde:
+Was ganze Laufwerke schwierig macht, und wie LocalRAG damit umgeht:
 
 | Befund | Lösung |
 |---|---|
 | Der Scanner folgte Windows-Junctions wie „Dokumente und Einstellungen“ → `C:\Users` | Junctions und Symlinks werden übersprungen |
 | 79 „Binärdateien“ waren UTF-16-Text, wie viele Windows-Programme ihn schreiben | UTF-16 mit und ohne BOM wird erkannt |
-| Wörterbücher, Tokenizer-Vokabular und Übersetzungstabellen (zusammen über 16.000 Abschnitte) verdrängten echte Treffer | .txt mit Hunderten Zeilen à 1–3 Wörtern und fast ohne Sätze, oder mit einer Zeile über 50.000 Zeichen, gilt als Wort-/Datenliste und wird übersprungen. Bestehende Indizes räumen das beim nächsten Lauf einmal auf |
+| Wörterbücher, Tokenizer-Vokabular und Übersetzungstabellen (zusammen über 16.000 Abschnitte) verdrängten echte Treffer | .txt mit Hunderten Zeilen à 1–3 Wörtern und fast ohne Sätze, oder mit einer Zeile über 50.000 Zeichen, gilt als Wort-/Datenliste und wird übersprungen |
 | Vektorsuche dauerte 309 statt 54 ms, weil sqlite-vec jeden Vektor einzeln vergleicht | Dienst und MCP-Server halten die Vektoren als Matrix im Arbeitsspeicher (230 MB). Eine Versionsnummer in der Datenbank sorgt fürs Neuladen nach Änderungen |
 | Das Laden dieser Matrix dauerte 48 s, weil sqlite-vec Vektor für Vektor liefert | Direkt die Blöcke lesen, in denen sqlite-vec je 1.024 Vektoren speichert: 1,7 s, gegen den langsamen Weg geprüft, mit automatischem Rückfall |
 | Tausende MuPDF-Meldungen zu kaputten PDFs im Log | Meldungen abgeschaltet, echte Fehler kommen weiter als Fehler |
@@ -440,15 +439,15 @@ Der verbleibende Abstand bei der Trefferquote kommt vor allem von echten Kopien.
 Werdegang stehen auch in Dutzenden Textentwürfen in den Code-Projekten. Bei einer Frage nach einem Datum
 landen diese verwandten Texte vor dem Originaldokument, das als einziges das Datum enthält. Das ist kein Fehler des Index,
 zeigt aber, dass die Frage, welche Ordner man indexiert, die Qualität mehr beeinflusst als jede
-Feinabstimmung. Daraus entstanden die [Konfigurationsdatei](#konfiguration-welche-ordner-was-nicht) mit
+Feinabstimmung. Deshalb gibt es die [Konfigurationsdatei](#konfiguration-welche-ordner-was-nicht) mit
 Ausschlüssen und die Erkennung erzeugter HTML-Dokumentation: Von 1.848 HTML-Dateien auf C: und D: lagen nur
 7 im Benutzerordner. Der Rest stammte aus Code-Projekten, der Python-Doku (Sphinx) und Spielen.
 
-**Getestet und verworfen: Jahreszahl-Bonus.** Idee: Bei „Stromrechnung 2023“ Abschnitte bevorzugen, die
+**Bewusst nicht eingebaut: Jahreszahl-Bonus.** Idee: Bei „Stromrechnung 2023“ Abschnitte bevorzugen, die
 2023 im Pfad oder Text tragen. Ergebnis auf 40 synthetischen Fragen (9 davon mit Jahreszahl) und den 78
 echten: keine einzige Änderung. bge-m3 trifft Jahreszahlen schon selbst, auch weil der Dateiname mit
 eingebettet wird. Der einzige Fehlgriff („Abschlag ab März 2024“ steht in der Abrechnung *2023*) lässt sich
-so nicht lösen. Der Code flog wieder raus.
+so nicht lösen.
 
 ## Architektur
 
@@ -472,12 +471,6 @@ flowchart LR
 | Fusion | Reciprocal Rank Fusion (k = 60), BM25-Liste bei ganzen Sätzen 0.3-fach gewichtet | [hybrid.py](src/localrag/retrieval/hybrid.py) |
 | Reranking (optional) | bge-reranker-v2-m3 liest Frage + Abschnitt gemeinsam und sortiert die Top 40 neu | [reranker.py](src/localrag/retrieval/reranker.py) |
 | Antwort | Prompt nur mit Quellen, Zitatpflicht, Schutz vor Anweisungen in Dokumenten | [prompts.py](src/localrag/generation/prompts.py) |
-
-## Geplant
-
-OCR für Bilddateien · Tray-App mit globalem Hotkey · Bildersuche (CLIP/SigLIP) · Windows-USN-Journal statt
-Dateiereignissen. Reihenfolge und Begründung stehen in [PLAN.md](PLAN.md), Änderungen im
-[CHANGELOG](CHANGELOG.md).
 
 ## Keine privaten Daten im Repo
 
@@ -504,7 +497,7 @@ uvx pre-commit install           # Schutz vor privaten Dateien und Secrets bei j
 ```
 
 Die CI läuft unter Windows und Ubuntu und prüft zusätzlich, dass die Stichwortsuche im Eval eine
-Mindestqualität hält.
+Mindestqualität hält. Änderungen je Version stehen im [CHANGELOG](CHANGELOG.md).
 
 ## Lizenz
 

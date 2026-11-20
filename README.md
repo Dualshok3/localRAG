@@ -1,21 +1,21 @@
-# LocalRAG – Semantische Suche über die eigenen Dateien
+# LocalRAG – Semantic search over your own files
 
 [![CI](https://github.com/Dualshok3/localRAG/actions/workflows/ci.yml/badge.svg)](https://github.com/Dualshok3/localRAG/actions/workflows/ci.yml)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
-[![Lizenz: MIT](https://img.shields.io/badge/lizenz-MIT-green)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/Dualshok3/localRAG)](https://github.com/Dualshok3/localRAG/releases)
-![100 % lokal](https://img.shields.io/badge/daten-100%25%20lokal-success)
+![100% local](https://img.shields.io/badge/data-100%25%20local-success)
 
-> Frag deinen Computer in natürlicher Sprache – komplett lokal, mit Quellenangabe.
+> Ask your computer in plain language – fully local, with sources.
 
-![Web-Oberfläche: Suche, Antwort mit Quellen, Filter](docs/images/demo.gif)
+![Web UI: search, answer with sources, filters](docs/images/demo.gif)
 
-*Web-Oberfläche (`localrag serve`, dann http://127.0.0.1:8765) über den erfundenen Testkorpus: Suche,
-Antwort mit Zitaten von Gemma 4 26B, Filter nach Ordner und Datum. Die Zeiten sind echt.*
+*Web UI (`localrag serve`, then http://127.0.0.1:8765) over the made-up test corpus: search, an answer with
+citations from Gemma 4 26B, filters by folder and date. The timings are real.*
 
-Die Windows-Suche findet Dateinamen und exakte Wörter. LocalRAG versteht den **Inhalt**: Die Frage
-„Darf ich eine Katze halten?“ findet den Paragrafen *Haustiere* im Mietvertrag, obwohl das Wort „Katze“
-dort nirgends steht.
+Windows Search finds file names and exact words. LocalRAG understands the **content**: the question
+"Darf ich eine Katze halten?" ("Am I allowed to keep a cat?") finds the *pets* clause in the rental
+contract, even though the word "cat" appears nowhere in it.
 
 ```text
 > localrag ask "Darf ich eine Katze halten?"
@@ -27,82 +27,88 @@ Quellen
 [1] D:\Dokumente\Wohnung\mietvertrag.md  · Mietvertrag Wohnung Lindenstraße 12 > §8 Haustiere
 ```
 
-*Antwort von Gemma 4 26B über den synthetischen Testkorpus, Pfad gekürzt. Suche rund 30 ms, Antwort rund 3 s.*
+*Answer from Gemma 4 26B over the synthetic test corpus ("Keeping pets requires the landlord's prior
+consent, except for small animals in cages"), path shortened. Search about 30 ms, answer about 3 s.*
 
-## Was es kann
+LocalRAG is built for German-speaking users: the CLI, the web UI and the answer prompt are in German, and
+the test corpus and stemming are German. The search itself is multilingual (bge-m3), so English documents
+work as well.
 
-- 🔒 **100 % lokal:** Embeddings auf der eigenen GPU (oder CPU), Antworten über LM Studio oder einen anderen lokalen
-  OpenAI-kompatiblen Server. Keine Cloud, kein Konto.
-- 🔎 **Hybrid-Suche:** BM25-Stichwortsuche (SQLite FTS5, deutsches Stemming) plus Vektorsuche
-  (bge-m3, sqlite-vec), zusammengeführt per Reciprocal Rank Fusion. Alles in **einer** SQLite-Datei,
-  Begründung in [ADR 0001](docs/adr/0001-sqlite-statt-vektordatenbank.md).
-- 💬 **Antworten mit Zitaten:** Jede Aussage ist mit `[n]` belegt. Steht nichts in den Dateien, sagt das
-  Modell das, statt zu raten.
-- ⚡ **Inkrementell:** Beim zweiten Lauf werden nur geänderte Dateien neu verarbeitet.
-- 🎯 **Optionaler Reranker:** `--rerank` sortiert die Kandidaten mit einem Cross-Encoder neu, hilft bei
-  umschriebenen Fragen, kostet aber rund 0,3 s pro Suche
-  ([Messung](#härtere-fragen-gewichtung-und-reranker)).
-- 🧭 **Filter in der Anfrage:** `type:pdf`, `in:Rechnungen`, `-in:Backup`, `after:2024-01`,
-  `before:2024-07` – in CLI, Web-Oberfläche, API und MCP.
-- 🚀 **Hintergrunddienst mit Web-Oberfläche:** `localrag serve` hält das Modell geladen, Suchen dauern dann
-  Millisekunden. Treffer lassen sich mit einem Klick öffnen, PDFs direkt an der richtigen Seite.
-- 👀 **Immer aktuell:** `localrag watch` oder `serve --watch` beobachtet die Ordner und indexiert neue,
-  geänderte und gelöschte Dateien nach wenigen Sekunden.
-- 🤖 **MCP-Server:** Claude Desktop, Claude Code und andere Clients können direkt in den Dateien suchen.
-- 📊 **Gemessen statt behauptet:** Ein Eval-Set vergleicht Stichwort-, Vektor- und Hybridsuche, die
-  Ergebnisse stehen [weiter unten](#messung-stichwort-vs-vektor-vs-hybrid).
+## Features
 
-Formate: PDF (gescannte PDFs per OCR, unter Windows ohne Zusatzsoftware), DOCX, XLSX, PPTX, HTML,
-E-Mails (EML, MSG), Markdown, TXT, CSV. Quellcode auf Wunsch (`code = true` in der Konfiguration).
-Übersprungen statt indexiert werden Wörterbücher und Datenlisten, CSV-Exporte mit über 5.000 Zeilen,
-von Werkzeugen erzeugte HTML-Dokumentation (Sphinx, Doxygen, Javadoc …) und Programmdateien, die
-zufällig auf `.msg` enden.
+- 🔒 **100% local:** embeddings on your own GPU (or CPU), answers via LM Studio or any other local
+  OpenAI-compatible server. No cloud, no account.
+- 🔎 **Hybrid search:** BM25 keyword search (SQLite FTS5, German stemming) plus vector search
+  (bge-m3, sqlite-vec), merged with Reciprocal Rank Fusion. Everything lives in **one** SQLite file,
+  reasoning in [ADR 0001](docs/adr/0001-sqlite-statt-vektordatenbank.md).
+- 💬 **Answers with citations:** every statement is backed by `[n]`. If the files don't contain the
+  answer, the model says so instead of guessing.
+- ⚡ **Incremental:** on the second run only changed files are processed again.
+- 🎯 **Optional reranker:** `--rerank` re-sorts the candidates with a cross-encoder. It helps with
+  paraphrased questions but costs about 0.3 s per search
+  ([measurements](#harder-questions-weighting-and-reranker)).
+- 🧭 **Filters in the query:** `type:pdf`, `in:Rechnungen`, `-in:Backup`, `after:2024-01`,
+  `before:2024-07` – in the CLI, web UI, API and MCP.
+- 🚀 **Background service with web UI:** `localrag serve` keeps the model loaded, so searches take
+  milliseconds. Results open with one click, PDFs right at the matching page.
+- 👀 **Always up to date:** `localrag watch` or `serve --watch` watches the folders and indexes new,
+  changed and deleted files within seconds.
+- 🤖 **MCP server:** Claude Desktop, Claude Code and other clients can search your files directly.
+- 📊 **Measured, not claimed:** an eval set compares keyword, vector and hybrid search; the results are
+  [further down](#measurements-keyword-vs-vector-vs-hybrid).
+
+Formats: PDF (scanned PDFs via OCR, no extra software needed on Windows), DOCX, XLSX, PPTX, HTML,
+e-mails (EML, MSG), Markdown, TXT, CSV. Source code on request (`code = true` in the config).
+Skipped instead of indexed: dictionaries and data lists, CSV exports with more than 5,000 rows, HTML
+documentation generated by tools (Sphinx, Doxygen, Javadoc …) and program files that happen to end in
+`.msg`.
 
 ## Quickstart
 
-Voraussetzung: [uv](https://docs.astral.sh/uv/).
+Requirement: [uv](https://docs.astral.sh/uv/).
 
 ```bash
 git clone https://github.com/Dualshok3/localRAG.git && cd localRAG
-uv sync --extra semantic --extra ocr          # PyTorch/CUDA + Windows-OCR; ohne Extras: nur Stichwortsuche
-uv run localrag index "D:\Dokumente"          # inkrementell, beim zweiten Lauf nur Änderungen
+uv sync --extra semantic --extra ocr          # PyTorch/CUDA + Windows OCR; without extras: keyword search only
+uv run localrag index "D:\Dokumente"          # incremental, the second run only processes changes
 uv run localrag search "Darf ich eine Katze halten?"
-uv run localrag search "PF-1234" --mode keyword   # schnell, ohne Modell
+uv run localrag search "PF-1234" --mode keyword   # fast, no model
 uv run localrag status --errors
 ```
 
-| Variable | Bedeutung | Standard |
+| Variable | Meaning | Default |
 |---|---|---|
-| `LOCALRAG_DB` | Index-Datenbank (auch `--db`) | `db` aus der Konfiguration, sonst `~/.localrag/localrag.db` |
-| `LOCALRAG_CONFIG` | Konfigurationsdatei | `~/.localrag/config.toml` |
-| `LOCALRAG_MODELS` | Speicherort der Modelle (~4,5 GB) | Hugging-Face-Cache |
-| `LOCALRAG_EMBEDDING_MODEL` | Embedding-Modell | `BAAI/bge-m3` |
-| `LOCALRAG_LLM_URL` | OpenAI-kompatibler Chat-Server | `http://localhost:1234/v1` (LM Studio) |
-| `LOCALRAG_LLM_MODEL` | Modell-ID auf dem Server | bereits geladenes Modell |
+| `LOCALRAG_DB` | Index database (also `--db`) | `db` from the config, otherwise `~/.localrag/localrag.db` |
+| `LOCALRAG_CONFIG` | Config file | `~/.localrag/config.toml` |
+| `LOCALRAG_MODELS` | Where models are stored (~4.5 GB) | Hugging Face cache |
+| `LOCALRAG_EMBEDDING_MODEL` | Embedding model | `BAAI/bge-m3` |
+| `LOCALRAG_DEVICE` | Device for the embedding and reranker model | `device` from the config, otherwise automatic |
+| `LOCALRAG_LLM_URL` | OpenAI-compatible chat server | `http://localhost:1234/v1` (LM Studio) |
+| `LOCALRAG_LLM_MODEL` | Model ID on the server | the model already loaded |
 
-### Konfiguration: welche Ordner, was nicht
+### Configuration: which folders, what to leave out
 
-Statt die Ordner bei jedem Aufruf anzugeben, stehen sie in `~/.localrag/config.toml`
-(Vorlage mit `localrag config --init`, Anzeige mit `localrag config`):
+Instead of passing the folders on every call, they live in `~/.localrag/config.toml`
+(create a template with `localrag config --init`, show it with `localrag config`):
 
 ```toml
-folders = ["D:/Dokumente", "C:/Users/ich/Desktop"]
+folders = ["D:/Dokumente", "C:/Users/me/Desktop"]
 exclude = ["python_projects", "*backup*", "D:/Dokumente/Alt"]
 max_file_mb = 50
 db = "D:/localrag/index.db"
-code = false        # Quellcode (.py, .js, .cs …) mitindexieren
+code = false        # also index source code (.py, .js, .cs …)
 ```
 
-`exclude`: Ein Name oder Muster gilt für Ordner und Dateien an beliebiger Stelle, ein Pfad nur für genau
-diesen Ordner. Die eingebauten Ausschlüsse (`node_modules`, `.git`, `AppData`, `Windows`, …) gelten
-zusätzlich. Kommt ein Ausschluss später dazu, verschwinden die betroffenen Dateien beim nächsten Lauf aus
-dem Index. `localrag index` ohne Ordner nimmt dann `folders`.
+`exclude`: a name or pattern applies to folders and files anywhere, a path applies only to exactly that
+folder. The built-in exclusions (`node_modules`, `.git`, `AppData`, `Windows`, …) apply on top. If an
+exclusion is added later, the affected files disappear from the index on the next run. `localrag index`
+without folders then uses `folders`.
 
-Warum das wichtig ist, zeigt der [Test über ganze Laufwerke](#ganze-laufwerke): Kopien persönlicher
-Angaben in Code-Projekten verdrängten dort die Originale. `exclude = ["python_projects"]` löst das an der
-Wurzel, `-in:python_projects` in der Anfrage im Einzelfall.
+Why this matters is shown by the [whole-drive test](#whole-drives): copies of personal details in code
+projects pushed the originals out of the results. `exclude = ["python_projects"]` fixes that at the root,
+`-in:python_projects` in the query fixes it case by case.
 
-### Filter in der Anfrage
+### Filters in the query
 
 ```bash
 uv run localrag search "Stromrechnung type:pdf after:2024"
@@ -110,395 +116,389 @@ uv run localrag search "Kündigung in:Wohnung -in:Backup"
 uv run localrag ask "Wie hoch war der Abschlag? in:Stadtwerke before:2024-07"
 ```
 
-| Filter | Wirkung |
+| Filter | Effect |
 |---|---|
-| `type:pdf`, `type:pdf,docx` | nur diese Dateitypen |
-| `in:Rechnungen`, `in:"Meine Dokumente"` | Pfad enthält diesen Teil (ohne Groß-/Kleinschreibung) |
-| `-in:Backup` | Pfad enthält ihn nicht |
-| `after:2024`, `after:2024-03`, `after:2024-03-15` | Datei ab diesem Zeitpunkt geändert |
-| `before:2024-07` | Datei vor diesem Zeitpunkt geändert |
+| `type:pdf`, `type:pdf,docx` | only these file types |
+| `in:Rechnungen`, `in:"Meine Dokumente"` | path contains this part (case-insensitive) |
+| `-in:Backup` | path does not contain it |
+| `after:2024`, `after:2024-03`, `after:2024-03-15` | file modified on or after this date |
+| `before:2024-07` | file modified before this date |
 
-Die Vektorsuche rechnet bei Filtern exakt in der passenden Teilmenge, statt global zu suchen und danach
-auszusieben. Sonst bliebe bei `in:Rechnungen` oft nichts übrig, weil die besten Treffer des ganzen Index
-woanders liegen.
+With filters, the vector search computes exactly within the matching subset instead of searching globally
+and filtering afterwards. Otherwise `in:Rechnungen` would often leave nothing, because the best hits of
+the whole index are somewhere else.
 
-### Index aktuell halten
+### Keeping the index up to date
 
 ```bash
-uv run localrag watch                # Ordner aus der Konfiguration beobachten (eigener Prozess)
-uv run localrag serve --watch        # oder im Dienst: ein Prozess, ein geladenes Modell
+uv run localrag watch                # watch the folders from the config (separate process)
+uv run localrag serve --watch        # or inside the service: one process, one loaded model
 ```
 
-Beim Start wird einmal abgeglichen, was sich in der Zwischenzeit geändert hat. Danach sammelt der Watcher
-Dateiereignisse und verarbeitet sie nach 2 s Ruhe gemeinsam. Ein Programm, das beim Speichern mehrmals
-schreibt, löst so nur eine Neuindexierung aus. Gelöschte und umbenannte Dateien und Ordner verschwinden
-aus dem Index. Damit das ohne Zutun läuft, startet `localrag autostart --enable` den Dienst samt Watcher bei
-jeder Windows-Anmeldung unsichtbar im Hintergrund (Skript im Autostart-Ordner, keine Admin-Rechte nötig,
-Log unter `~/.localrag/serve.log`). `--disable` nimmt das zurück.
+On start it catches up once on everything that changed in the meantime. After that the watcher collects
+file events and processes them together after 2 s of quiet. A program that writes several times while
+saving therefore triggers only one re-index. Deleted and renamed files and folders disappear from the
+index. To have this run without any manual step, `localrag autostart --enable` starts the service with the
+watcher invisibly at every Windows sign-in (script in the Startup folder, no admin rights needed, log at
+`~/.localrag/serve.log`). `--disable` undoes it.
 
 ```bash
 uv run localrag autostart --enable
 ```
 
-### Dateien sofort aufnehmen
+### Adding files right away
 
-Was in den beobachteten Ordnern landet, ist nach etwa 2 s durchsuchbar. Für alles andere, etwa Dateien auf
-einem USB-Stick oder gerade im Browser geöffnete Dokumente, gibt es drei Wege:
+Anything that lands in a watched folder is searchable after about 2 s. For everything else, such as files
+on a USB stick or documents just opened in the browser, there are three ways:
 
-| Weg | So geht's |
+| Way | How |
 |---|---|
-| Explorer | Rechtsklick → *Senden an* → *LocalRAG (indexieren)*, einmalig einrichten mit `localrag sendto --enable`. Ein kurzer Dialog meldet das Ergebnis. |
-| Web-Oberfläche | Dateien auf die Seite ziehen oder *＋ Dateien* wählen. Sie werden in den Eingangsordner kopiert (`inbox` in der Konfiguration, Standard `Dokumente\LocalRAG-Eingang`) und sofort indexiert. |
-| Kommandozeile | `localrag add <datei-oder-ordner>` |
+| Explorer | Right-click → *Send to* → *LocalRAG (indexieren)*, set up once with `localrag sendto --enable`. A short dialog reports the result. |
+| Web UI | Drag files onto the page or choose *＋ Dateien*. They are copied to the inbox folder (`inbox` in the config, default `Documents\LocalRAG-Eingang`) and indexed immediately. |
+| Command line | `localrag add <file-or-folder>` |
 
-Läuft der Dienst, rechnet er in allen drei Fällen mit seinem bereits geladenen Modell. Es kommt also kein
-zweites in den Grafikspeicher. Dateien außerhalb der beobachteten Ordner werden einmal aufgenommen, spätere
-Änderungen daran aber nicht automatisch nachgezogen.
+If the service is running, all three use its already loaded model, so no second copy ends up in GPU
+memory. Files outside the watched folders are added once; later changes to them are not picked up
+automatically.
 
-### Web-Oberfläche
+### Web UI
 
-`localrag serve` liefert unter http://127.0.0.1:8765 eine Oberfläche ohne externe Abhängigkeiten:
-Suchen mit `Enter`, Fragen mit `Strg`+`Enter`, Zitate `[n]` springen zur Quelle. „Öffnen“ startet das
-Standardprogramm, „Im Ordner zeigen“ den Explorer, PDFs öffnen auf Wunsch im Browser an der gefundenen
-Seite. Die Seite folgt dem hellen oder dunklen Farbschema des Systems und funktioniert auch auf schmalen
-Fenstern.
+`localrag serve` provides a UI at http://127.0.0.1:8765 with no external dependencies: search with
+`Enter`, ask with `Ctrl`+`Enter`, citations `[n]` jump to the source. "Öffnen" (open) launches the default
+program, "Im Ordner zeigen" (show in folder) opens Explorer, and PDFs can open in the browser at the
+matching page. The page follows the system's light or dark theme and also works in narrow windows.
 
-Schutz gegen fremde Webseiten im selben Browser: Der Dienst lehnt Anfragen mit fremdem Host-Header ab
-(DNS-Rebinding), und Öffnen geht nur mit einem eigenen Header, den eine fremde Seite ohne CORS-Freigabe
-nicht senden darf. Ausgeliefert werden nur Dateien, die im Index stehen.
+Protection against other websites in the same browser: the service rejects requests with a foreign host
+header (DNS rebinding), and opening files requires a custom header that a foreign page cannot send without
+a CORS grant. Only files that are in the index are served.
 
-### Fragen beantworten (lokales LLM)
+### Answering questions (local LLM)
 
-`localrag ask` sucht die passenden Textstellen und lässt ein lokales Sprachmodell daraus eine Antwort mit
-Quellenangaben formulieren. Getestet mit [LM Studio](https://lmstudio.ai). Jeder OpenAI-kompatible Server
-funktioniert ebenso (llama.cpp, vLLM, Ollama).
+`localrag ask` finds the matching passages and lets a local language model write an answer with sources.
+Tested with [LM Studio](https://lmstudio.ai). Any OpenAI-compatible server works too (llama.cpp, vLLM,
+Ollama).
 
 ```bash
-lms server start                     # LM-Studio-Server
-lms load gemma-4-26b-a4b-it          # oder ein anderes Modell
+lms server start                     # LM Studio server
+lms load gemma-4-26b-a4b-it          # or another model
 uv run localrag ask "Wie hoch ist der neue Stromabschlag?"
 ```
 
-Stichprobe mit 4 Fragen auf einer RTX 5060 Ti (16 GB): Beide Modelle antworten in rund 3 s.
+Spot check with 4 questions on an RTX 5060 Ti (16 GB): both models answer in about 3 s.
 
-| Modell | richtig | Auffälligkeit |
+| Model | correct | Notable |
 |---|---|---|
-| Qwen3.5-9B | 3/4 | „Darf ich eine Katze halten?“ → „Ja“, weil es die Katze als „Kleintier in Käfigen“ einordnet |
-| **Gemma 4 26B-A4B** (MoE) | **4/4** | nennt korrekt die Bedingung: Zustimmung des Vermieters |
+| Qwen3.5-9B | 3/4 | "Am I allowed to keep a cat?" → "Yes", because it classifies the cat as a "small animal in a cage" |
+| **Gemma 4 26B-A4B** (MoE) | **4/4** | correctly names the condition: the landlord's consent |
 
-Die Suche lieferte in beiden Fällen die richtige Klausel. Der Fehler liegt also beim Schlussfolgern des
-kleineren Modells, nicht beim Retrieval.
+In both cases the search returned the right clause, so the mistake lies in the smaller model's reasoning,
+not in retrieval.
 
-Das Modell bekommt nur die gefundenen Textstellen und soll jede Aussage mit `[n]` belegen. Steht die
-Antwort nicht in den Quellen, sagt es „Dazu habe ich in deinen Dateien nichts gefunden.“
+The model only gets the passages that were found and must back every statement with `[n]`. If the answer
+is not in the sources, it says "Dazu habe ich in deinen Dateien nichts gefunden." ("I found nothing about
+this in your files.")
 
-Beim ersten Start wird bge-m3 heruntergeladen. Ohne Dienst lädt die CLI das Modell bei jeder Suche neu,
-das dauert rund 20 s. Schneller geht es mit dem Hintergrunddienst:
+bge-m3 is downloaded on first start. Without the service, the CLI loads the model again for every search,
+which takes about 20 s. The background service is faster:
 
 ```bash
-uv run localrag serve            # hält das Modell geladen, nur unter 127.0.0.1 erreichbar
-uv run localrag search "…"       # nutzt den Dienst automatisch → Antwort in Millisekunden
-uv run localrag search "…" --local   # Dienst ignorieren
+uv run localrag serve            # keeps the model loaded, reachable on 127.0.0.1 only
+uv run localrag search "…"       # uses the service automatically → answer in milliseconds
+uv run localrag search "…" --local   # ignore the service
 ```
 
-Der Dienst bietet auch eine HTTP-API (`/search`, `/ask`, `/health`, `/stats`, `/file`, `/open`, `/index`, `/upload`, Doku unter
-`http://127.0.0.1:8765/docs`).
-Weil er Inhalte deiner Dateien herausgibt, bindet er standardmäßig nur an 127.0.0.1.
+The service also offers an HTTP API (`/search`, `/ask`, `/health`, `/stats`, `/file`, `/open`, `/index`,
+`/upload`, docs at `http://127.0.0.1:8765/docs`). Because it hands out the contents of your files, it binds
+to 127.0.0.1 only by default.
 
-### Als Werkzeug für Claude (MCP)
+### As a tool for Claude (MCP)
 
-Mit `localrag mcp` bekommen Claude Desktop, Claude Code und andere MCP-Clients drei Werkzeuge:
-`search_files`, `read_passage` (Volltext eines Treffers samt Nachbarabschnitten) und `index_status`.
-Der Assistent kann damit mehrfach suchen und gezielt nachlesen.
+With `localrag mcp`, Claude Desktop, Claude Code and other MCP clients get three tools: `search_files`,
+`read_passage` (full text of a hit including neighbouring passages) and `index_status`. The assistant can
+search several times and read up on specific passages.
 
 ```bash
 uv sync --extra semantic --extra mcp
-claude mcp add localrag -- uv --directory C:\pfad\zu\localRAG run localrag mcp --allow "D:\Dokumente"
+claude mcp add localrag -- uv --directory C:\path\to\localRAG run localrag mcp --allow "D:\Dokumente"
 ```
 
-Für Claude Desktop in `claude_desktop_config.json`:
+For Claude Desktop, in `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "localrag": {
       "command": "uv",
-      "args": ["--directory", "C:\\pfad\\zu\\localRAG", "run", "localrag", "mcp", "--allow", "D:\\Dokumente"],
+      "args": ["--directory", "C:\\path\\to\\localRAG", "run", "localrag", "mcp", "--allow", "D:\\Dokumente"],
       "env": { "LOCALRAG_DB": "D:\\localrag\\localrag.db", "LOCALRAG_MODELS": "D:\\localrag\\models" }
     }
   }
 }
 ```
 
-> **Datenschutz:** Was die Werkzeuge zurückgeben, landet im Kontext des Assistenten. Bei einem
-> Cloud-Modell verlassen diese Ausschnitte deinen Rechner, anders als bei `localrag ask` mit LM Studio.
-> Mit `--allow` lässt sich die Herausgabe auf bestimmte Ordner begrenzen. Treffer aus anderen Ordnern
-> verschweigt der Server dann komplett.
+> **Privacy:** whatever the tools return ends up in the assistant's context. With a cloud model these
+> excerpts leave your computer, unlike `localrag ask` with LM Studio. `--allow` limits what is handed out
+> to specific folders; hits from other folders are then withheld completely.
 
-## Messung: Stichwort vs. Vektor vs. Hybrid
+## Measurements: keyword vs. vector vs. hybrid
 
-Synthetischer Testkorpus mit 16 Dokumenten und 40 Fragen ([eval/results/latest.md](eval/results/latest.md)).
-Er enthält absichtlich ähnliche Dokumente als Fallen: Stromrechnung 2023 und 2024, Wohnungs- und
-Garagenmietvertrag, alter und aktueller Arbeitsvertrag.
+Synthetic test corpus with 16 documents and 40 questions ([eval/results/latest.md](eval/results/latest.md)).
+It deliberately contains similar documents as traps: electricity bills for 2023 and 2024, a flat and a
+garage rental contract, an old and a current employment contract.
 
-| Fragen | n | BM25 | Vektor (bge-m3) | Hybrid (RRF) |
+| Questions | n | BM25 | Vector (bge-m3) | Hybrid (RRF) |
 |---|---|---|---|---|
-| Stichworte aus dem Dokument | 12 | 1.00 | 1.00 | 1.00 |
-| Umschreibungen („Darf ich eine Katze halten?“ → *Haustiere*) | 13 | 0.23 | **0.92** | 0.69 |
-| Exakte Kennungen (Seriennummer, IP, Betrag) | 5 | **1.00** | 0.40 | **1.00** |
-| Ähnliche Dokumente unterscheiden („Strom **2023**“) | 10 | 0.50 | **0.90** | 0.70 |
-| **Gesamt** | 40 | 0.62 | **0.88** | 0.82 |
+| Keywords from the document | 12 | 1.00 | 1.00 | 1.00 |
+| Paraphrases ("Am I allowed to keep a cat?" → *pets*) | 13 | 0.23 | **0.92** | 0.69 |
+| Exact identifiers (serial number, IP, amount) | 5 | **1.00** | 0.40 | **1.00** |
+| Telling similar documents apart ("electricity **2023**") | 10 | 0.50 | **0.90** | 0.70 |
+| **Total** | 40 | 0.62 | **0.88** | 0.82 |
 
-Angegeben ist Recall@1, also wie oft die richtige Datei auf Platz 1 steht. Bei Recall@3 erreichen
-Vektor und Hybrid jeweils 1.00, die richtige Datei ist also immer unter den ersten drei. Latenz pro Suche
-auf der GPU: rund 25 ms.
+Shown is Recall@1, i.e. how often the right file is in first place. At Recall@3, vector and hybrid both
+reach 1.00, so the right file is always among the top three. Latency per search on the GPU: about 25 ms.
 
-Was man daraus lernt:
-- **BM25** scheitert an Umschreibungen, **Vektoren** an exakten Kennungen.
-- **Hybrid** ist bei Kennungen perfekt, verliert aber bei Umschreibungen Plätze. Einfaches RRF gewichtet
-  beide Listen gleich. Findet BM25 nur zufällige Wortübereinstimmungen in falschen Dateien, schieben
-  diese den richtigen Vektor-Treffer auf Platz 2 oder 3.
-- Hybrid ist der Standard, weil es nie komplett danebenliegt. Bei ganzen Sätzen wird die BM25-Liste
-  schwächer gewichtet, dazu gibt es einen optionalen Reranker. Auf echten Dateien hilft beides, hier im
-  synthetischen Korpus kaum, siehe
-  [Härtere Fragen, Gewichtung und Reranker](#härtere-fragen-gewichtung-und-reranker).
+What this shows:
+- **BM25** fails on paraphrases, **vectors** fail on exact identifiers.
+- **Hybrid** is perfect on identifiers but loses places on paraphrases. Plain RRF weights both lists
+  equally. When BM25 only finds chance word matches in wrong files, they push the right vector hit to
+  second or third place.
+- Hybrid is the default because it is never completely off. For full sentences the BM25 list is weighted
+  lower, and there is an optional reranker. Both help on real files, hardly at all on this synthetic
+  corpus, see [Harder questions, weighting and reranker](#harder-questions-weighting-and-reranker).
 
-Einschränkung: 40 Fragen sind wenig, ein bis zwei Fragen verschieben die Werte um mehrere Prozentpunkte.
-Selbst messen: `uv run python eval/run_eval.py`
+Limitation: 40 questions are few; one or two questions shift the values by several percentage points.
+Measure it yourself: `uv run python eval/run_eval.py`
 
-## Antwortqualität
+## Answer quality
 
-Die Suche liefert die Quellen, ein Sprachmodell formuliert daraus die Antwort. Ob die stimmt, misst
-[eval/run_answer_eval.py](eval/run_answer_eval.py) auf demselben erfundenen Korpus: 20 beantwortbare
-Fragen mit Referenzantwort (Kernaussage plus optionale Details) und 5 Fallen, deren Antwort nicht in den
-Dateien steht, etwa die Schadenfreiheitsklasse der *Teilkasko*, wenn nur Haftpflicht und Vollkasko
-genannt sind. Alle Modelle bekommen dieselben Quellen. Ein Prüfmodell bewertet, ob die Kernaussage
-getroffen und jede Aussage belegt ist (LLM-as-Judge, Temperatur 0). Ob das Modell „weiß ich nicht“ sagt
-und auf die richtige Datei verweist, wird ohne Prüfmodell gezählt.
+Search provides the sources, a language model turns them into the answer. Whether that answer is right is
+measured by [eval/run_answer_eval.py](eval/run_answer_eval.py) on the same made-up corpus: 20 answerable
+questions with a reference answer (core statement plus optional details) and 5 traps whose answer is not in
+the files, such as the no-claims class of the *partial* car insurance when only liability and fully
+comprehensive cover are mentioned. All models get the same sources. A judge model checks whether the core
+statement is met and every statement is backed by a source (LLM-as-judge, temperature 0). Whether the model
+says "I don't know" and cites the right file is counted without a judge.
 
-| Modell | richtig | belegt | Zitat auf richtige Datei | „weiß ich nicht“ korrekt | Antwortzeit p50 |
+| Model | correct | backed | citation to right file | "I don't know" correct | response time p50 |
 |---|---|---|---|---|---|
-| **Gemma 4 26B-A4B** (LM Studio) | **20/20** | **20/20** | **20/20** | **5/5** | 2,8 s |
-| crit-Engine (Gemma 4) | 18/20 | **20/20** | 19/20 | **5/5** | 6,8 s |
-| Qwen3.5-9B (LM Studio) | 17/20 | 19/20 | **20/20** | 4/5 | 2,9 s |
+| **Gemma 4 26B-A4B** (LM Studio) | **20/20** | **20/20** | **20/20** | **5/5** | 2.8 s |
+| crit engine (Gemma 4) | 18/20 | **20/20** | 19/20 | **5/5** | 6.8 s |
+| Qwen3.5-9B (LM Studio) | 17/20 | 19/20 | **20/20** | 4/5 | 2.9 s |
 
-Prüfmodell: crit-Engine. Vollständige Liste der Fehler: [eval/results/answers.md](eval/results/answers.md).
+Judge model: crit engine. Full list of mistakes: [eval/results/answers.md](eval/results/answers.md).
 
-- **Qwen** schlussfolgert falsch: Eine Katze sei ein „Kleintier in Käfigen“ und brauche keine Zustimmung,
-  24 Monate Garantie ab März 2024 enden angeblich im September 2025, und auf die Frage nach einer
-  Nachzahlung antwortet es „Ja“, obwohl es im selben Satz das Guthaben nennt. Bei der Teilkasko erfindet
-  es eine Schadenfreiheitsklasse.
-- **Die crit-Engine** nennt einmal den Abschlag aus der *älteren* Rechnung (65 statt 70 EUR) und lässt
-  einmal das Kaufdatum weg. Erfunden hat sie nichts, und bei allen Fallen sagt sie „weiß ich nicht“.
-- **Gemma** macht keinen Fehler.
+- **Qwen** reasons wrongly: a cat is supposedly a "small animal in a cage" and needs no consent, a 24-month
+  warranty from March 2024 supposedly ends in September 2025, and asked about an additional payment it says
+  "yes" while naming the credit in the same sentence. For the partial car insurance it invents a no-claims
+  class.
+- **The crit engine** once gives the instalment from the *older* bill (65 instead of 70 EUR) and once leaves
+  out the purchase date. It invents nothing, and on every trap it says "I don't know".
+- **Gemma** makes no mistakes.
 
-Einschränkungen: 25 Fragen sind wenig. Das Prüfmodell ist zugleich eines der geprüften Modelle und
-könnte eigene Antworten milder bewerten. Mit Gemma als Prüfmodell und strengeren Referenzen lag die
-Rangfolge gleich (Gemma vor Qwen). Die Antwortzeit der crit-Engine ist unter paralleler Last gemessen.
+Limitations: 25 questions are few. The judge is also one of the models under test and might rate its own
+answers more leniently. With Gemma as the judge and stricter references the ranking was the same (Gemma
+ahead of Qwen). The crit engine's response time was measured under parallel load.
 
 ```bash
 uv run python eval/run_answer_eval.py --models gemma-4-26b-a4b-it,qwen3.5-9b --judge gemma-4-26b-a4b-it --write-report
 ```
 
-`localrag ask` nutzt jeden OpenAI-kompatiblen Server. Welcher es ist, steht in der Konfiguration:
+`localrag ask` works with any OpenAI-compatible server. Which one is set in the config:
 
 ```toml
 llm_url = "http://127.0.0.1:8000/v1"
-llm_model = "mein-modell"
+llm_model = "my-model"
 ```
 
-Läuft das Sprachmodell auf derselben Grafikkarte und wird der Speicher knapp, kann das Suchmodell auf den
-Prozessor ausweichen. Dafür `device = "cpu"` in die Konfiguration schreiben, oder die Umgebungsvariable
-`LOCALRAG_DEVICE` setzen. Gemessen im Index mit 7.193 Abschnitten: Eine Suche dauert danach 0,3 bis 0,5 s.
-Die erste Suche nach dem Start lädt das Modell und dauert einmalig knapp eine Minute. Ganze Ordner neu zu
-indexieren wird deutlich langsamer.
+If the language model runs on the same GPU and memory gets tight, the embedding model can move to the CPU:
+put `device = "cpu"` in the config or set the environment variable `LOCALRAG_DEVICE`. Measured on an index
+with 7,193 passages: a search then takes 0.3 to 0.5 s. The first search after start loads the model and
+takes just under a minute once. Re-indexing whole folders becomes considerably slower.
 
-## Test mit echten Dateien
+## Test with real files
 
-Auch an einem echten Rechner getestet: Desktop, Dokumente, Downloads und ein Studienordner mit 334 Dateien.
-Darunter sind Verträge, Studienunterlagen, eine Abschlussarbeit, fünf Fachbücher mit mehreren hundert
-Seiten und typischer Ballast wie Spiele-Konfigurationen. Die Fragen und Daten bleiben privat, hier stehen
-nur die Zahlen. Hardware: RTX 5060 Ti 16 GB.
+Also tested on a real computer: Desktop, Documents, Downloads and a university folder with 334 files.
+Among them are contracts, course material, a thesis, five textbooks with several hundred pages each and the
+usual clutter such as game configs. The questions and data stay private; only the numbers are shown here.
+Hardware: RTX 5060 Ti 16 GB.
 
-| Schritt | Zeit |
+| Step | Time |
 |---|---|
-| Text extrahieren + Stichwortindex (334 Dateien → 6.788 Abschnitte) | 33 s |
-| Vektoren berechnen (bge-m3, GPU) | 102 s (~67 Abschnitte/s) |
-| Zweiter Lauf, nichts geändert | 0,2 s |
-| Indexgröße | 66 MB |
+| Extract text + keyword index (334 files → 6,788 passages) | 33 s |
+| Compute vectors (bge-m3, GPU) | 102 s (~67 passages/s) |
+| Second run, nothing changed | 0.2 s |
+| Index size | 66 MB |
 
-| Suche | p50 | p95 |
+| Search | p50 | p95 |
 |---|---|---|
-| Stichwort (im Prozess) | 4,6 ms | 10 ms |
-| Hybrid (im Prozess, inkl. Frage einbetten) | 51 ms | 64 ms |
-| Stichwort über den Dienst (HTTP) | 10 ms | 46 ms |
-| Hybrid über den Dienst (HTTP) | 56 ms | 70 ms |
-| `localrag search` über den Dienst (inkl. Python-Start) | ~2 s | |
-| `localrag search` ohne Dienst (Modell wird geladen) | ~19 s | |
-| `localrag ask` mit Gemma 4 26B über den Dienst | 6–8 s | |
+| Keyword (in process) | 4.6 ms | 10 ms |
+| Hybrid (in process, incl. embedding the question) | 51 ms | 64 ms |
+| Keyword via the service (HTTP) | 10 ms | 46 ms |
+| Hybrid via the service (HTTP) | 56 ms | 70 ms |
+| `localrag search` via the service (incl. Python start-up) | ~2 s | |
+| `localrag search` without the service (model is loaded) | ~19 s | |
+| `localrag ask` with Gemma 4 26B via the service | 6–8 s | |
 
-**Trefferquote** bei 24 Fragen mit bekannter richtiger Datei, darunter zwei zu gescannten PDFs:
+**Hit rate** on 24 questions with a known right file, two of them about scanned PDFs:
 
-| | BM25 | Vektor | Hybrid | Windows-Suche |
+| | BM25 | Vector | Hybrid | Windows Search |
 |---|---|---|---|---|
 | Recall@1 | 0.79 | 0.75 | **0.79** | 0.25 |
 | Recall@5 | 0.83 | 0.92 | **1.00** | 0.25 |
 
-Die Windows-Suche indexiert standardmäßig nur die Benutzerordner auf C:, der Studienordner auf D: fehlt
-ihr komplett. Nur auf die Fragen zu Dateien gerechnet, die sie kennt, findet sie 6 von 13. Ganze Sätze
-liefern dort fast immer null Treffer, nur Stichworte und Kennungen funktionieren.
+By default Windows Search only indexes the user folders on C:; the university folder on D: is missing
+entirely. Counting only questions about files it knows, it finds 6 of 13. Full sentences almost always
+return zero hits there; only keywords and identifiers work.
 
-Der Test mit echten Dateien hat typische Stolpersteine gezeigt. So geht LocalRAG damit um:
+The test with real files showed typical stumbling blocks. This is how LocalRAG handles them:
 
-| Befund | Lösung | Wirkung |
+| Finding | Solution | Effect |
 |---|---|---|
-| 8 gescannte PDFs ohne Textebene, z. B. ein Zeugnis | OCR über die eingebaute Windows-Texterkennung, gedrehte Scans werden automatisch erkannt | alle 8 lesbar, „Welche Note steht in meinem Zeugnis?“ wird richtig beantwortet |
-| Viele fast gleiche Backups derselben Datei belegen alle Top-Plätze | Nahezu gleiche Abschnitte (≥ 85 % gleiche Wörter) zu einem Treffer zusammenfassen, Hinweis „+ gleicher Inhalt in …“ | Platz frei für andere Dateien |
-| DOCX mit beschädigtem eingebettetem Bild nicht lesbar | Text notfalls direkt aus `word/document.xml` lesen | Datei lesbar |
-| Leere Antwort des LLM bei unbeantwortbarer Frage | Fester Satz „Dazu habe ich in deinen Dateien nichts gefunden.“ | |
-| Kein Modell geladen → LM Studio lud ungefragt ein anderes (10 GB) | Klare Fehlermeldung statt stillem Wechsel | |
+| 8 scanned PDFs without a text layer, e.g. a school report | OCR via the built-in Windows text recognition; rotated scans are detected automatically | all 8 readable, "Which grade is on my report?" is answered correctly |
+| Many near-identical backups of the same file take all top places | Near-identical passages (≥ 85% identical words) are merged into one hit, with a note "+ same content in …" | room for other files |
+| DOCX with a damaged embedded image is unreadable | Fall back to reading the text directly from `word/document.xml` | file readable |
+| Empty LLM answer for an unanswerable question | Fixed sentence "Dazu habe ich in deinen Dateien nichts gefunden." | |
+| No model loaded → LM Studio loaded a different one (10 GB) without asking | Clear error message instead of a silent switch | |
 
-Ohne diese Maßnahmen läge Recall@5 von Hybrid bei 0.88 statt 0.96, gerechnet über dieselben 24 Fragen.
-Mit der Gewichtung (nächster Abschnitt) sind es 1.00.
+Without these measures hybrid Recall@5 would be 0.88 instead of 0.96 on the same 24 questions. With the
+weighting (next section) it is 1.00.
 
-### Härtere Fragen, Gewichtung und Reranker
+### Harder questions, weighting and reranker
 
-Die 24 Fragen oben entstanden nach dem Lesen der Dokumente und teilen deshalb oft Wörter mit ihnen, das
-begünstigt BM25. Dazu kommen zwei weitere Sets: 12 Fragen, die bewusst andere Wörter benutzen
-(Frage und Dokument haben kein Wort gemeinsam, zwei davon auf Deutsch zu englischen Dokumenten), und 42
-gemischte Fragen zu weiteren Dokumenten (Zeugnisse, Bordkarte, E-Mails, Lernskripte). Zusammen 78.
+The 24 questions above were written after reading the documents and therefore often share words with them,
+which favours BM25. Two more sets complement them: 12 questions that deliberately use different words
+(question and document share no word; two of them ask in German about English documents) and 42 mixed
+questions about further documents (school reports, a boarding pass, e-mails, study notes). 78 in total.
 
-| Variante | 24 Basis | 12 schwere | 42 gemischte | **alle 78** | p50 |
+| Variant | 24 base | 12 hard | 42 mixed | **all 78** | p50 |
 |---|---|---|---|---|---|
 | BM25 | 0.79 / 0.83 | 0.17 / 0.33 | 0.62 / 0.79 | 0.60 / 0.73 | 20 ms |
-| Vektor | 0.75 / 0.92 | 0.42 / 0.67 | 0.74 / 0.93 | 0.69 / 0.88 | 54 ms |
-| Hybrid, beide Listen gleich | 0.79 / 0.96 | 0.25 / 0.42 | 0.71 / 0.90 | 0.67 / 0.85 | 54 ms |
-| **Hybrid, gewichtet (Standard)** | 0.79 / **1.00** | 0.33 / **0.67** | 0.76 / 0.95 | **0.71 / 0.92** | 53 ms |
-| Hybrid gewichtet + Reranker (`--rerank`) | **0.88 / 1.00** | 0.25 / 0.58 | **0.83 / 0.98** | **0.76 / 0.92** | 388 ms |
+| Vector | 0.75 / 0.92 | 0.42 / 0.67 | 0.74 / 0.93 | 0.69 / 0.88 | 54 ms |
+| Hybrid, both lists equal | 0.79 / 0.96 | 0.25 / 0.42 | 0.71 / 0.90 | 0.67 / 0.85 | 54 ms |
+| **Hybrid, weighted (default)** | 0.79 / **1.00** | 0.33 / **0.67** | 0.76 / 0.95 | **0.71 / 0.92** | 53 ms |
+| Hybrid weighted + reranker (`--rerank`) | **0.88 / 1.00** | 0.25 / 0.58 | **0.83 / 0.98** | **0.76 / 0.92** | 388 ms |
 
-Werte: Recall@1 / Recall@5. MRR über alle 78: Vektor 0.76, Hybrid ungewichtet 0.75, gewichtet 0.79, mit
-Reranker 0.83.
+Values: Recall@1 / Recall@5. MRR over all 78: vector 0.76, hybrid unweighted 0.75, weighted 0.79, with
+reranker 0.83.
 
-**Gewichtung nach Art der Anfrage.** Bei ganzen Sätzen findet BM25 viele Zufallstreffer über
-Allerweltswörter und schiebt den richtigen Vektortreffer nach unten. Deshalb zählt die BM25-Liste bei
-Sätzen nur 0.3-fach, erkannt an Füllwörtern wie „ich“, „der“, „wann“ oder einem Fragezeichen. Bei
-Kennungen und Stichworten („WTEST-998877“, „Router Firmware“) zählt sie voll. Das kostet keine
-Zeit und schlägt beide Einzelverfahren. Getestet wurden auch feste Gewichte 0.5 und 0.3 für alle
-Anfragen: Sie verlieren Kennungen wie Buchungs- und Auftragsnummern, die nur BM25 findet.
+**Weighting by query type.** For full sentences BM25 finds many chance hits through common words and pushes
+the right vector hit down. That's why the BM25 list counts only 0.3× for sentences, detected by filler words
+such as "ich", "der", "wann" or a question mark. For identifiers and keywords ("WTEST-998877", "Router
+Firmware") it counts fully. This costs no time and beats both individual methods. Fixed weights of 0.5 and
+0.3 for all queries were tested too: they lose identifiers such as booking and order numbers that only BM25
+finds.
 
-**Reranker.** [bge-reranker-v2-m3](https://huggingface.co/BAAI/bge-reranker-v2-m3) liest die 40 besten
-Abschnitte zusammen mit der Frage und sortiert sie neu. Er bringt vor allem Platz 1 (0.71 → 0.76), kostet
-aber gut 0,3 s pro Suche und bleibt deshalb optional. Getestet wurde auch, seine Reihenfolge mit der
-der ersten Stufe zu mischen statt sie zu ersetzen. Auf diesen 78 Fragen war das gleichauf (MRR 0.84 statt
-0.83), über ganze Laufwerke aber schlechter (Recall@1 0.69 statt 0.73). Deshalb ersetzt der Reranker
-die Reihenfolge.
+**Reranker.** [bge-reranker-v2-m3](https://huggingface.co/BAAI/bge-reranker-v2-m3) reads the 40 best
+passages together with the question and re-sorts them. It mostly improves first place (0.71 → 0.76) but
+costs a good 0.3 s per search, so it stays optional. Blending its order with the first stage's instead of
+replacing it was tested as well: on these 78 questions it was on par (MRR 0.84 instead of 0.83), but worse
+over whole drives (Recall@1 0.69 instead of 0.73). That's why the reranker replaces the order.
 
-Was keine Variante findet: zwei kurze E-Mails, deren Text fast nur aus Platzhaltern besteht und deren
-Thema in einer Abkürzung steckt („SF-Klasse“ für Schadenfreiheitsrabatt). Außerdem die
-Rechnung, die fast nur aus Großbuchstaben-Kürzeln besteht.
+What no variant finds: two short e-mails whose text consists almost entirely of placeholders and whose topic
+hides in an abbreviation ("SF-Klasse" for the no-claims discount), and the bill that consists almost
+entirely of upper-case abbreviations.
 
-Einschränkung: Im synthetischen Korpus oben ändert die Gewichtung nichts (Hybrid Recall@1 bleibt 0.83).
-Dort hat BM25 falsche Dateien oft auf Platz 1, die gleichzeitig auf Vektor-Platz 2 liegen. Das reicht in
-RRF auch mit Gewicht 0.3 noch für den ersten Platz.
+Limitation: on the synthetic corpus above the weighting changes nothing (hybrid Recall@1 stays at 0.83).
+There, BM25 often has wrong files in first place that are also in second place for vectors. In RRF that is
+still enough for first place even with a weight of 0.3.
 
-### Ganze Laufwerke
+### Whole drives
 
-Der härteste Test: C: und D: komplett, ohne System- und Programmordner. Dazu kommen
-Code-Projekte, Spiele, Modell-Downloads und Werkzeug-Ordner, also viel Inhalt, der mit den gesuchten
-Dokumenten konkurriert.
+The hardest test: all of C: and D:, without system and program folders. That includes code projects,
+games, model downloads and tool folders, i.e. lots of content competing with the documents you are looking
+for.
 
-| | Benutzerordner | ganze Laufwerke | mit Konfiguration² |
+| | user folders | whole drives | with config² |
 |---|---|---|---|
-| Dateien gescannt | 334 | 8.771 | 381 |
-| davon indexiert / übersprungen / Fehler | 313 / – / 21¹ | 8.372 / 375 / 13 | 369 / 7 / 5 |
-| Abschnitte | 6.808 | 57.498 | 7.193 |
-| Erster Lauf inkl. Vektoren | 2,3 min | 30 min | 2,7 min |
-| Zweiter Lauf, nichts geändert | 0,2 s | 1:49 min (Scan von 2 Laufwerken) | 4,4 s |
-| Hybrid-Suche über den Dienst, p50 | 56 ms | 53 ms | – |
-| Hybrid Recall@1 / @5 (78 Fragen) | 0.71 / 0.92 | 0.67 / 0.83 | 0.68 / 0.90 |
-| mit Reranker | 0.76 / 0.92 | 0.73 / 0.86 | **0.74 / 0.94** |
+| Files scanned | 334 | 8,771 | 381 |
+| indexed / skipped / errors | 313 / – / 21¹ | 8,372 / 375 / 13 | 369 / 7 / 5 |
+| Passages | 6,808 | 57,498 | 7,193 |
+| First run incl. vectors | 2.3 min | 30 min | 2.7 min |
+| Second run, nothing changed | 0.2 s | 1:49 min (scanning 2 drives) | 4.4 s |
+| Hybrid search via the service, p50 | 56 ms | 53 ms | – |
+| Hybrid Recall@1 / @5 (78 questions) | 0.71 / 0.92 | 0.67 / 0.83 | 0.68 / 0.90 |
+| with reranker | 0.76 / 0.92 | 0.73 / 0.86 | **0.74 / 0.94** |
 
-¹ Ohne die UTF-16-Erkennung aus der Tabelle unten gemessen, die meisten dieser Fehler waren UTF-16-Dateien.
-² Benutzerordner plus ganz D:, mit [Konfiguration](#konfiguration-welche-ordner-was-nicht): Code-Projekte,
-Spiele und Werkzeug-Ordner per `exclude` ausgeschlossen, mit allen Formaten (auch Excel, PowerPoint, HTML,
-E-Mails). Mehr Ordner als „Benutzerordner“, aber kaum mehr Rauschen: Mit Reranker ist das der beste Wert
-aller drei Indizes.
+¹ Measured without the UTF-16 detection from the table below; most of these errors were UTF-16 files.
+² User folders plus all of D:, with a [config](#configuration-which-folders-what-to-leave-out): code
+projects, games and tool folders excluded via `exclude`, with all formats (including Excel, PowerPoint,
+HTML, e-mails). More folders than "user folders", but hardly more noise: with the reranker this is the best
+value of all three indexes.
 
-Was ganze Laufwerke schwierig macht, und wie LocalRAG damit umgeht:
+What makes whole drives hard, and how LocalRAG handles it:
 
-| Befund | Lösung |
+| Finding | Solution |
 |---|---|
-| Der Scanner folgte Windows-Junctions wie „Dokumente und Einstellungen“ → `C:\Users` | Junctions und Symlinks werden übersprungen |
-| 79 „Binärdateien“ waren UTF-16-Text, wie viele Windows-Programme ihn schreiben | UTF-16 mit und ohne BOM wird erkannt |
-| Wörterbücher, Tokenizer-Vokabular und Übersetzungstabellen (zusammen über 16.000 Abschnitte) verdrängten echte Treffer | .txt mit Hunderten Zeilen à 1–3 Wörtern und fast ohne Sätze, oder mit einer Zeile über 50.000 Zeichen, gilt als Wort-/Datenliste und wird übersprungen |
-| Vektorsuche dauerte 309 statt 54 ms, weil sqlite-vec jeden Vektor einzeln vergleicht | Dienst und MCP-Server halten die Vektoren als Matrix im Arbeitsspeicher (230 MB). Eine Versionsnummer in der Datenbank sorgt fürs Neuladen nach Änderungen |
-| Das Laden dieser Matrix dauerte 48 s, weil sqlite-vec Vektor für Vektor liefert | Direkt die Blöcke lesen, in denen sqlite-vec je 1.024 Vektoren speichert: 1,7 s, gegen den langsamen Weg geprüft, mit automatischem Rückfall |
-| Tausende MuPDF-Meldungen zu kaputten PDFs im Log | Meldungen abgeschaltet, echte Fehler kommen weiter als Fehler |
+| The scanner followed Windows junctions such as "Dokumente und Einstellungen" → `C:\Users` | Junctions and symlinks are skipped |
+| 79 "binary files" were UTF-16 text, as many Windows programs write it | UTF-16 with and without BOM is detected |
+| Dictionaries, tokenizer vocabularies and translation tables (over 16,000 passages together) pushed out real hits | A .txt with hundreds of lines of 1–3 words and hardly any sentences, or with a line over 50,000 characters, counts as a word/data list and is skipped |
+| Vector search took 309 instead of 54 ms because sqlite-vec compares every vector one by one | The service and MCP server keep the vectors as a matrix in RAM (230 MB). A version number in the database triggers a reload after changes |
+| Loading that matrix took 48 s because sqlite-vec returns vector by vector | Read the blocks in which sqlite-vec stores 1,024 vectors each directly: 1.7 s, checked against the slow path, with automatic fallback |
+| Thousands of MuPDF messages about broken PDFs in the log | Messages turned off; real errors still come through as errors |
 
-Der verbleibende Abstand bei der Trefferquote kommt vor allem von echten Kopien. Dieselben Angaben zum
-Werdegang stehen auch in Dutzenden Textentwürfen in den Code-Projekten. Bei einer Frage nach einem Datum
-landen diese verwandten Texte vor dem Originaldokument, das als einziges das Datum enthält. Das ist kein Fehler des Index,
-zeigt aber, dass die Frage, welche Ordner man indexiert, die Qualität mehr beeinflusst als jede
-Feinabstimmung. Deshalb gibt es die [Konfigurationsdatei](#konfiguration-welche-ordner-was-nicht) mit
-Ausschlüssen und die Erkennung erzeugter HTML-Dokumentation: Von 1.848 HTML-Dateien auf C: und D: lagen nur
-7 im Benutzerordner. Der Rest stammte aus Code-Projekten, der Python-Doku (Sphinx) und Spielen.
+The remaining gap in hit rate comes mostly from real copies. The same career details also appear in dozens
+of text drafts in the code projects. For a question about a date, these related texts rank above the
+original document, which is the only one that contains the date. That's not a fault of the index, but it
+shows that the choice of folders to index affects quality more than any fine-tuning. That's why there is
+the [config file](#configuration-which-folders-what-to-leave-out) with exclusions and the detection of
+generated HTML documentation: of 1,848 HTML files on C: and D:, only 7 were in the user folders. The rest
+came from code projects, the Python docs (Sphinx) and games.
 
-**Bewusst nicht eingebaut: Jahreszahl-Bonus.** Idee: Bei „Stromrechnung 2023“ Abschnitte bevorzugen, die
-2023 im Pfad oder Text tragen. Ergebnis auf 40 synthetischen Fragen (9 davon mit Jahreszahl) und den 78
-echten: keine einzige Änderung. bge-m3 trifft Jahreszahlen schon selbst, auch weil der Dateiname mit
-eingebettet wird. Der einzige Fehlgriff („Abschlag ab März 2024“ steht in der Abrechnung *2023*) lässt sich
-so nicht lösen.
+**Deliberately not included: a year bonus.** Idea: for "Stromrechnung 2023", prefer passages that carry 2023
+in the path or text. Result on 40 synthetic questions (9 of them with a year) and the 78 real ones: not a
+single change. bge-m3 already handles years itself, partly because the file name is embedded too. The only
+miss ("instalment from March 2024" is in the *2023* bill) cannot be solved that way.
 
-## Architektur
+## Architecture
 
 ```mermaid
 flowchart LR
-    F[Dateien] --> P[Parser] --> C[Chunker] --> E[Embeddings bge-m3]
+    F[Files] --> P[Parser] --> C[Chunker] --> E[Embeddings bge-m3]
     E --> V[(SQLite sqlite-vec)]
     C --> B[(SQLite FTS5)]
-    Q[Frage] --> V & B --> R[RRF] --> L[LLM via LM Studio] --> A[Antwort + Zitate]
+    Q[Question] --> V & B --> R[RRF] --> L[LLM via LM Studio] --> A[Answer + citations]
     R -.-> RR[Reranker, optional] -.-> L
 ```
 
-| Schritt | Umsetzung | Code |
+| Step | Implementation | Code |
 |---|---|---|
-| Parsen | PyMuPDF (PDF, pro Seite), python-docx (Überschriften, Tabellen), openpyxl (je Tabellenblatt), python-pptx (je Folie, mit Notizen), HTML, E-Mails (EML/MSG mit Anhängen), Markdown/TXT/CSV | [ingest/parsers](src/localrag/ingest/parsers) |
-| Aktualisieren | watchdog-Ereignisse, 2 s gesammelt, dann inkrementell wie `localrag index` | [watcher.py](src/localrag/ingest/watcher.py) |
-| Chunking | Absätze zu ~350 Wörtern packen, 50 Wörter Überlappung, Überschriftenpfad merken | [chunker.py](src/localrag/ingest/chunker.py) |
-| Stichwortindex | FTS5 mit BM25, Text vorab per Snowball auf Wortstämme reduziert | [text_norm.py](src/localrag/index/text_norm.py) |
-| Vektorindex | bge-m3 (1024 Dim., fp16 auf CUDA), normalisiert in sqlite-vec | [vector_store.py](src/localrag/index/vector_store.py) |
-| Filter | `type:` `in:` `-in:` `after:` `before:` aus der Anfrage, Vektorsuche exakt in der Teilmenge | [filters.py](src/localrag/retrieval/filters.py) |
-| Fusion | Reciprocal Rank Fusion (k = 60), BM25-Liste bei ganzen Sätzen 0.3-fach gewichtet | [hybrid.py](src/localrag/retrieval/hybrid.py) |
-| Reranking (optional) | bge-reranker-v2-m3 liest Frage + Abschnitt gemeinsam und sortiert die Top 40 neu | [reranker.py](src/localrag/retrieval/reranker.py) |
-| Antwort | Prompt nur mit Quellen, Zitatpflicht, Schutz vor Anweisungen in Dokumenten | [prompts.py](src/localrag/generation/prompts.py) |
+| Parsing | PyMuPDF (PDF, per page), python-docx (headings, tables), openpyxl (per sheet), python-pptx (per slide, with notes), HTML, e-mails (EML/MSG with attachments), Markdown/TXT/CSV | [ingest/parsers](src/localrag/ingest/parsers) |
+| Updating | watchdog events, collected for 2 s, then incremental like `localrag index` | [watcher.py](src/localrag/ingest/watcher.py) |
+| Chunking | Pack paragraphs into ~350 words, 50 words of overlap, remember the heading path | [chunker.py](src/localrag/ingest/chunker.py) |
+| Keyword index | FTS5 with BM25, text reduced to word stems with Snowball beforehand | [text_norm.py](src/localrag/index/text_norm.py) |
+| Vector index | bge-m3 (1024 dims, fp16 on CUDA), normalized in sqlite-vec | [vector_store.py](src/localrag/index/vector_store.py) |
+| Filters | `type:` `in:` `-in:` `after:` `before:` from the query, vector search exactly within the subset | [filters.py](src/localrag/retrieval/filters.py) |
+| Fusion | Reciprocal Rank Fusion (k = 60), BM25 list weighted 0.3× for full sentences | [hybrid.py](src/localrag/retrieval/hybrid.py) |
+| Reranking (optional) | bge-reranker-v2-m3 reads question + passage together and re-sorts the top 40 | [reranker.py](src/localrag/retrieval/reranker.py) |
+| Answer | Prompt with sources only, citations required, protection against instructions inside documents | [prompts.py](src/localrag/generation/prompts.py) |
 
-## Keine privaten Daten im Repo
+## No private data in the repo
 
-Das Projekt arbeitet mit sehr persönlichen Dateien, deshalb gibt es mehrere Sicherungen:
+The project works with very personal files, so there are several safeguards:
 
-- Index, Modelle und Dokumente liegen außerhalb des Repos (`~/.localrag`, `LOCALRAG_MODELS`).
-- Der Testkorpus ist vollständig erfunden ([eval/corpus](eval/corpus)). Test-PDFs und -DOCX entstehen erst
-  zur Laufzeit.
-- [pre-commit](.pre-commit-config.yaml) blockiert Dokumente, Datenbanken und `.env`-Dateien
-  ([check_private_files.py](scripts/check_private_files.py)) und sucht mit gitleaks nach Geheimnissen.
-  gitleaks läuft zusätzlich in der CI.
+- Index, models and documents live outside the repo (`~/.localrag`, `LOCALRAG_MODELS`).
+- The test corpus is entirely made up ([eval/corpus](eval/corpus)). Test PDFs and DOCX files are only
+  generated at runtime.
+- [pre-commit](.pre-commit-config.yaml) blocks documents, databases and `.env` files
+  ([check_private_files.py](scripts/check_private_files.py)) and scans for secrets with gitleaks.
+  gitleaks also runs in CI.
 
-## Tech-Stack
+## Tech stack
 
-Python 3.12 · uv · PyTorch/CUDA · sentence-transformers · SQLite (FTS5 + sqlite-vec) · LM Studio (OpenAI-API) · httpx · FastAPI · Typer · watchdog · MCP
+Python 3.12 · uv · PyTorch/CUDA · sentence-transformers · SQLite (FTS5 + sqlite-vec) · LM Studio (OpenAI API) · httpx · FastAPI · Typer · watchdog · MCP
 
-## Entwickeln
+## Development
 
 ```bash
-uv sync                          # ohne PyTorch, Tests nutzen ein Fake-Embedding
+uv sync                          # without PyTorch, tests use a fake embedding
 uv run pytest -q
 uv run ruff check . && uv run ruff format --check .
-uvx pre-commit install           # Schutz vor privaten Dateien und Secrets bei jedem Commit
+uvx pre-commit install           # guards against private files and secrets on every commit
 ```
 
-Die CI läuft unter Windows und Ubuntu und prüft zusätzlich, dass die Stichwortsuche im Eval eine
-Mindestqualität hält. Änderungen je Version stehen im [CHANGELOG](CHANGELOG.md).
+CI runs on Windows and Ubuntu and additionally checks that keyword search keeps a minimum quality in the
+eval. Changes per version are listed in the [CHANGELOG](CHANGELOG.md).
 
-## Lizenz
+## License
 
-Siehe [LICENSE](LICENSE).
+See [LICENSE](LICENSE).

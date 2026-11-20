@@ -107,3 +107,16 @@ def test_indexing_leaves_no_open_write_transaction(db: Database, corpus: Path):
     index_paths(db, [corpus], embedder=HashingEmbedder())  # nichts Neues einzubetten
     index_paths(db, [corpus], embedder=HashingEmbedder())
     assert not db.conn.in_transaction
+
+
+def test_new_chunker_version_rechunks_everything_once(db: Database, corpus: Path):
+    from localrag.ingest.chunker import CHUNKER_VERSION
+
+    first = index_paths(db, [corpus])
+    assert db.get_meta("chunker_version") == str(CHUNKER_VERSION)
+    with db.transaction():
+        db.set_meta("chunker_version", "1")  # Index aus älterer Version
+    rerun = index_paths(db, [corpus])
+    assert rerun.updated == first.added - first.empty - first.skipped - first.failed
+    assert db.get_meta("chunker_version") == str(CHUNKER_VERSION)
+    assert index_paths(db, [corpus]).updated == 0

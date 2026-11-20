@@ -464,7 +464,7 @@ flowchart LR
 |---|---|---|
 | Parsing | PyMuPDF (PDF, per page), python-docx (headings, tables), openpyxl (per sheet), python-pptx (per slide, with notes), HTML, e-mails (EML/MSG with attachments), Markdown/TXT/CSV | [ingest/parsers](src/localrag/ingest/parsers) |
 | Updating | watchdog events, collected for 2 s, then incremental like `localrag index` | [watcher.py](src/localrag/ingest/watcher.py) |
-| Chunking | Pack paragraphs into ~350 words, 50 words of overlap, remember the heading path | [chunker.py](src/localrag/ingest/chunker.py) |
+| Chunking | Pack paragraphs into ~350 words, 50 words of overlap (whole sentences if a paragraph is too long, carried across PDF page breaks), remember the heading path | [chunker.py](src/localrag/ingest/chunker.py) |
 | Keyword index | FTS5 with BM25, text reduced to word stems with Snowball beforehand | [text_norm.py](src/localrag/index/text_norm.py) |
 | Vector index | bge-m3 (1024 dims, fp16 on CUDA), normalized in sqlite-vec | [vector_store.py](src/localrag/index/vector_store.py) |
 | Filters | `type:` `in:` `-in:` `after:` `before:` from the query, vector search exactly within the subset | [filters.py](src/localrag/retrieval/filters.py) |

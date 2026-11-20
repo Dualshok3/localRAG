@@ -3,6 +3,15 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- Chunk overlap also works for long paragraphs: the last whole sentences of the previous chunk are carried over
+  (falling back to the last words). In PDFs the first chunk of a page starts with the end of the previous page,
+  so a sentence across a page break stays together. On the real-file set (78 questions) hybrid search with
+  reranker went from 0.74 to 0.79 Recall@1 (MRR 0.83 → 0.85); without reranker unchanged.
+- A new chunker version re-chunks all documents once on the next index run.
+
 ## [0.3.0] – 2026-11-19
 
 Ready for everyday use: autostart, adding files right away, selectable compute device.
@@ -74,6 +83,7 @@ First published version.
 - Scales to whole drives: junctions are skipped, word and data lists left out, vectors kept in RAM.
 - Eval set with measurements: keyword, vector, hybrid and reranker, plus a comparison with Windows Search.
 
+[Unreleased]: https://github.com/Dualshok3/localRAG/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/Dualshok3/localRAG/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Dualshok3/localRAG/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Dualshok3/localRAG/releases/tag/v0.1.0

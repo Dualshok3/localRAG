@@ -12,7 +12,7 @@ from localrag.index.db import ChunkInput, Database
 from localrag.index.embedder import Embedder
 from localrag.index.text_norm import normalize
 from localrag.index.vector_store import VectorStore
-from localrag.ingest.chunker import Chunk, chunk_sections
+from localrag.ingest.chunker import CHUNKER_VERSION, Chunk, chunk_sections
 from localrag.ingest.ocr import OcrEngine
 from localrag.ingest.parsers import SUPPORTED_EXTENSIONS, ParseError, SkippedFile, parse
 from localrag.ingest.parsers.text import data_file_reason, read_text
@@ -58,6 +58,21 @@ OCR_TRIED = "kein Text, auch nicht per OCR"
 PARSER_VERSION = 3  # 3: UTF-16-Textdateien, Wort-/Datenlisten werden übersprungen
 
 
+def _mark_for_rechunk(db: Database, has_docs: bool) -> None:
+    """Neue Aufteilung → alle gelesenen Dokumente als geändert markieren.
+
+    Markiert wird in der Datenbank, nicht nur für diesen Lauf: Ein Watcher-Lauf über eine einzelne Datei
+    darf die übrigen nicht als erledigt abhaken. Jeder spätere Lauf, der ein markiertes Dokument sieht,
+    zerlegt es neu.
+    """
+    if db.get_meta("chunker_version") == str(CHUNKER_VERSION):
+        return
+    with db.transaction():
+        if has_docs:
+            db.conn.execute("UPDATE documents SET mtime = 0, hash = NULL WHERE status = 'ok'")
+        db.set_meta("chunker_version", str(CHUNKER_VERSION))
+
+
 def index_file(
     db: Database, info: FileInfo, file_digest: str, ocr: OcrEngine | None = None
 ) -> tuple[str, int, str | None]:
@@ -65,7 +80,7 @@ def index_file(
     status, error = "ok", None
     chunks: list[Chunk] = []
     try:
-        chunks = chunk_sections(parse(info.path, ocr=ocr))
+        chunks = chunk_sections(parse(info.path, ocr=ocr), page_overlap=info.filetype == "pdf")
         if not chunks:
             status = "empty"
             # merken, dass OCR schon versucht wurde → beim nächsten Lauf nicht erneut
@@ -134,6 +149,7 @@ def index_paths(
     has_docs = db.conn.execute("SELECT 1 FROM documents LIMIT 1").fetchone() is not None
     stored_version = db.get_meta("parser_version") or ("1" if has_docs else None)
     parsers_improved = stored_version not in (None, str(PARSER_VERSION))
+    _mark_for_rechunk(db, has_docs)
 
     for info in files:
         stats.scanned += 1
